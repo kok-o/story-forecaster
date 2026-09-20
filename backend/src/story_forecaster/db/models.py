@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Integer, DateTime, Text, ForeignKey, JSON
+    Column, String, Integer, DateTime, Text, ForeignKey, JSON, UniqueConstraint, Index
 )
 from sqlalchemy.orm import relationship
 from .session import Base
@@ -53,6 +53,9 @@ class WorkVersion(Base):
 
 class Chapter(Base):
     __tablename__ = "chapters"
+    __table_args__ = (
+        UniqueConstraint("work_version_id", "ordinal", name="uq_chapter_version_ordinal"),
+    )
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
     work_version_id = Column(String(36), ForeignKey("work_versions.id"), nullable=False)
@@ -67,6 +70,10 @@ class Chapter(Base):
 
 class Scene(Base):
     __tablename__ = "scenes"
+    __table_args__ = (
+        UniqueConstraint("chapter_id", "ordinal", name="uq_scene_chapter_ordinal"),
+        Index("ix_scenes_chapter_ordinal", "chapter_id", "ordinal"),
+    )
 
     id = Column(String(36), primary_key=True, default=gen_uuid)
     chapter_id = Column(String(36), ForeignKey("chapters.id"), nullable=False)

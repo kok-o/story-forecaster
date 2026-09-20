@@ -26,7 +26,7 @@ def index_meta_corpus(db: Optional[Session] = None) -> Dict[str, Any]:
     try:
         project = db.query(Project).first()
         if not project:
-            project = Project(name="Default Story Forecaster Project")
+            project = Project(title="Default Story Forecaster Project")
             db.add(project)
             db.flush()
 
@@ -42,7 +42,6 @@ def index_meta_corpus(db: Optional[Session] = None) -> Dict[str, Any]:
                 print(f"Skipping {fb2_path} due to parse error: {e}")
                 continue
 
-            work_key = f"ref_{os.path.splitext(os.path.basename(fb2_path))[0]}"
             work = db.query(Work).filter_by(project_id=project.id, title=book.title, role="reference").first()
             if not work:
                 work = Work(
@@ -77,18 +76,28 @@ def index_meta_corpus(db: Optional[Session] = None) -> Dict[str, Any]:
                             first_match = sec.text[start:end].replace("\n", " ").strip()
                             break
 
-                    artifact = Artifact(
+                    import hashlib
+                    input_hash = hashlib.sha256(f"{book.title}:{sec.title}:{','.join(sorted(matched_tags))}".encode('utf-8')).hexdigest()
+                    existing_art = db.query(Artifact).filter_by(
                         project_id=project.id,
                         type="trope_precedent",
-                        content_json={
-                            "book_title": book.title,
-                            "section_title": sec.title,
-                            "tags": matched_tags,
-                            "excerpt": first_match or sec.text[:300],
-                            "char_count": sec.char_count
-                        }
-                    )
-                    db.add(artifact)
+                        input_hash=input_hash
+                    ).first()
+
+                    if not existing_art:
+                        artifact = Artifact(
+                            project_id=project.id,
+                            type="trope_precedent",
+                            input_hash=input_hash,
+                            content_json={
+                                "book_title": book.title,
+                                "section_title": sec.title,
+                                "tags": matched_tags,
+                                "excerpt": first_match or sec.text[:300],
+                                "char_count": sec.char_count
+                            }
+                        )
+                        db.add(artifact)
 
         db.commit()
         return {

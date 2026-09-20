@@ -59,6 +59,35 @@ def import_target_work(
         full_raw_text = "\n\n".join(full_text_parts)
         norm_full_text, norm_full_sha = normalize_text(full_raw_text)
 
+        from story_forecaster.ingestion.spans import extract_exact_scene_spans
+
+        # Check for existing version with identical content hash (Idempotency Guard)
+        existing_version = db.query(WorkVersion).filter_by(
+            work_id=work.id,
+            normalized_sha256=norm_full_sha
+        ).first()
+
+        if existing_version:
+            chapters = db.query(Chapter).filter_by(work_version_id=existing_version.id).order_by(Chapter.ordinal.asc()).all()
+            total_scenes = db.query(Scene).join(Chapter).filter(Chapter.work_version_id == existing_version.id).count()
+            return {
+                "project_id": project.id,
+                "work_id": work.id,
+                "version_id": existing_version.id,
+                "total_chapters": len(chapters),
+                "total_scenes": total_scenes,
+                "chapters": [
+                    {
+                        "ordinal": ch.ordinal,
+                        "title": ch.title,
+                        "char_count": ch.char_count,
+                        "scene_count": len(ch.scenes) if ch.scenes else db.query(Scene).filter_by(chapter_id=ch.id).count()
+                    }
+                    for ch in chapters
+                ],
+                "is_idempotent_hit": True
+            }
+
         version = WorkVersion(
             work_id=work.id,
             original_sha256=norm_full_sha,
@@ -68,7 +97,7 @@ def import_target_work(
         db.add(version)
         db.flush()
 
-        # 4. Import Chapters and Scenes
+        # 4. Import Chapters and Scenes with exact character coordinates
         global_discourse_seq = 0
         imported_chapters = []
 
@@ -80,7 +109,7 @@ def import_target_work(
             norm_text, ch_sha = normalize_text(ch_raw)
             chapter = Chapter(
                 work_version_id=version.id,
-                ordinal=ch_meta["num"],
+                ordinal=ch_meta.get("num", ch_meta.get("ordinal", 1)),
                 title=ch_meta["title"],
                 char_count=len(norm_text),
                 source_file=ch_meta["file"]
@@ -88,29 +117,26 @@ def import_target_work(
             db.add(chapter)
             db.flush()
 
-            # Split scenes by explicit dividers (***, ---, *****) or large breaks
-            scene_chunks = re.split(r'\n(?:\s*[*—_\-]{3,}\s*)\n', norm_text)
-            char_cursor = 0
-            for sc_ord, sc_text in enumerate(scene_chunks, start=1):
+            # Exact scene coordinates without arbitrary padding
+            spans = extract_exact_scene_spans(norm_text)
+            for span in spans:
                 global_discourse_seq += 1
-                sc_len = len(sc_text)
                 scene = Scene(
                     chapter_id=chapter.id,
-                    ordinal=sc_ord,
+                    ordinal=span.ordinal,
                     discourse_seq=global_discourse_seq,
-                    start_char=char_cursor,
-                    end_char=char_cursor + sc_len,
-                    content=sc_text,
-                    summary=f"Сцена {sc_ord} главы {chapter.ordinal} ({len(sc_text)} зн.)"
+                    start_char=span.start_char,
+                    end_char=span.end_char,
+                    content=span.content,
+                    summary=f"Сцена {span.ordinal} главы {chapter.ordinal} ({len(span.content)} зн.)"
                 )
                 db.add(scene)
-                char_cursor += sc_len + 5
 
             imported_chapters.append({
                 "ordinal": chapter.ordinal,
                 "title": chapter.title,
                 "char_count": chapter.char_count,
-                "scene_count": len(scene_chunks)
+                "scene_count": len(spans)
             })
 
         db.commit()
@@ -120,7 +146,8 @@ def import_target_work(
             "version_id": version.id,
             "total_chapters": len(imported_chapters),
             "total_scenes": global_discourse_seq,
-            "chapters": imported_chapters
+            "chapters": imported_chapters,
+            "is_idempotent_hit": False
         }
     except Exception as e:
         db.rollback()

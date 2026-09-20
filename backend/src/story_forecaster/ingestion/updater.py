@@ -73,7 +73,8 @@ class IncrementalChapterUpdater:
             target_title = title if title else f"Глава {target_ordinal:02d}."
 
             normalized_text, text_hash = normalize_text(raw_text)
-            scene_texts = self._split_into_scenes(normalized_text)
+            from story_forecaster.ingestion.spans import extract_exact_scene_spans
+            spans = extract_exact_scene_spans(normalized_text)
 
             existing_ch = db.query(Chapter).filter_by(work_version_id=latest_ver.id, ordinal=target_ordinal).first()
             created_new_version = False
@@ -105,18 +106,16 @@ class IncrementalChapterUpdater:
                         )
                         db.add(ch_to_add)
                         db.flush()
-                        offset = 0
-                        for idx, sc_text in enumerate(scene_texts, start=1):
+                        for span in spans:
                             sc = Scene(
                                 chapter_id=ch_to_add.id,
-                                ordinal=idx,
+                                ordinal=span.ordinal,
                                 discourse_seq=0,  # will be resequenced
-                                start_char=offset,
-                                end_char=offset + len(sc_text),
-                                summary=sc_text[:150].replace("\n", " ") + "...",
-                                content=sc_text
+                                start_char=span.start_char,
+                                end_char=span.end_char,
+                                summary=span.content[:150].replace("\n", " ") + "...",
+                                content=span.content
                             )
-                            offset += len(sc_text) + 2
                             db.add(sc)
                     else:
                         cloned_c = Chapter(
@@ -158,18 +157,16 @@ class IncrementalChapterUpdater:
                     db.add(ch_target)
                     db.flush()
 
-                offset = 0
-                for idx, sc_text in enumerate(scene_texts, start=1):
+                for span in spans:
                     sc = Scene(
                         chapter_id=ch_target.id,
-                        ordinal=idx,
+                        ordinal=span.ordinal,
                         discourse_seq=0,
-                        start_char=offset,
-                        end_char=offset + len(sc_text),
-                        summary=sc_text[:150].replace("\n", " ") + "...",
-                        content=sc_text
+                        start_char=span.start_char,
+                        end_char=span.end_char,
+                        summary=span.content[:150].replace("\n", " ") + "...",
+                        content=span.content
                     )
-                    offset += len(sc_text) + 2
                     db.add(sc)
 
             # Resequence all scenes in the target version contiguously by chapter.ordinal, scene.ordinal

@@ -15,6 +15,7 @@ from story_forecaster.canon.registry import CanonDivergenceRegistry
 from story_forecaster.retrieval import HybridRetrievalEngine, SearchResult
 from story_forecaster.evaluation import get_gold_chapter, BacktestEvaluator, EvaluationReport
 from story_forecaster.memory.engine import NarrativeMemoryEngine
+from story_forecaster.domain.resolver import resolve_scope
 
 app = FastAPI(
     title="Story Forecaster API",
@@ -87,15 +88,13 @@ def get_target_work(db: Session = Depends(get_db)):
 
 @app.get("/api/chapters")
 def get_chapters(db: Session = Depends(get_db)):
-    from story_forecaster.db.models import WorkVersion
-    work = db.query(Work).filter_by(role="target").first()
-    if not work:
-        return []
-    latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-    if not latest_ver:
+    try:
+        resolved = resolve_scope(db)
+        version_id = resolved.version.id
+    except ValueError:
         return []
 
-    chapters = db.query(Chapter).filter_by(work_version_id=latest_ver.id).order_by(Chapter.ordinal.asc()).all()
+    chapters = db.query(Chapter).filter_by(work_version_id=version_id).order_by(Chapter.ordinal.asc()).all()
     results = []
     for ch in chapters:
         scenes = db.query(Scene).filter_by(chapter_id=ch.id).order_by(Scene.discourse_seq.asc()).all()
@@ -112,77 +111,30 @@ def get_chapters(db: Session = Depends(get_db)):
 
 @app.get("/api/canon/summary")
 def get_canon_summary(cutoff_chapter: int = Query(23, ge=1, le=1000), db: Session = Depends(get_db)):
-    registry = CanonDivergenceRegistry()
-    target_ch = db.query(Chapter).filter_by(ordinal=cutoff_chapter).first()
-    max_seq = 192
-    if target_ch:
-        last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-        if last_scene:
-            max_seq = last_scene.discourse_seq
+    try:
+        resolved = resolve_scope(db, cutoff_chapter=cutoff_chapter)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    scope = ForecastScope(
-        project_id="default",
-        target_work_version_id="target_v1",
-        target_max_discourse_seq=max_seq
-    )
-    return registry.get_divergence_summary(scope)
+    registry = CanonDivergenceRegistry()
+    return registry.get_divergence_summary(resolved.scope)
 
 @app.post("/api/retrieval/search", response_model=List[SearchResult])
 def search_scenes(req: SearchRequest, db: Session = Depends(get_db)):
-    work = db.query(Work).filter_by(role="target").first()
-    if not work:
-        raise HTTPException(status_code=404, detail="Target work not found")
-
-    from story_forecaster.db.models import WorkVersion
-    latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-    version_id = latest_ver.id if latest_ver else work.id
-
-    target_ch = db.query(Chapter).filter(
-        (Chapter.work_version_id == version_id) if latest_ver else True,
-        Chapter.ordinal == req.cutoff_chapter
-    ).first()
-    if not target_ch:
-        raise HTTPException(status_code=404, detail=f"Chapter {req.cutoff_chapter} not found")
-
-    last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-    max_seq = last_scene.discourse_seq if last_scene else req.cutoff_chapter
-
-    scope = ForecastScope(
-        project_id=work.project_id,
-        target_work_version_id=version_id,
-        target_max_discourse_seq=max_seq,
-        mode="retrospective"
-    )
+    try:
+        resolved = resolve_scope(db, cutoff_chapter=req.cutoff_chapter)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     engine = HybridRetrievalEngine(db_session=db)
-    return engine.search(query=req.query, scope=scope, top_k=req.top_k)
+    return engine.search(query=req.query, scope=resolved.scope, top_k=req.top_k)
 
 @app.post("/api/forecast", response_model=ForecastResult)
 def run_forecast(req: ForecastRequest, db: Session = Depends(get_db)):
-    work = db.query(Work).filter_by(role="target").first()
-    if not work:
-        raise HTTPException(status_code=404, detail="Target work not found")
-
-    from story_forecaster.db.models import WorkVersion
-    latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-    version_id = latest_ver.id if latest_ver else work.id
-
-    target_ch = db.query(Chapter).filter(
-        (Chapter.work_version_id == version_id) if latest_ver else True,
-        Chapter.ordinal == req.cutoff_chapter
-    ).first()
-    if not target_ch:
-        raise HTTPException(status_code=404, detail=f"Chapter {req.cutoff_chapter} not found")
-
-    last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-    max_seq = last_scene.discourse_seq if last_scene else req.cutoff_chapter
-
-    scope = ForecastScope(
-        project_id=work.project_id,
-        target_work_version_id=version_id,
-        target_max_discourse_seq=max_seq,
-        mode="retrospective"
-    )
+    try:
+        resolved = resolve_scope(db, cutoff_chapter=req.cutoff_chapter)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     try:
         from story_forecaster.providers import get_provider, ProviderUnavailableError
@@ -191,28 +143,15 @@ def run_forecast(req: ForecastRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
     engine = ForecastEngine(provider=provider)
-    result = engine.run_forecast(scope=scope, num_candidates=req.num_candidates, persist_run=True)
+    result = engine.run_forecast(scope=resolved.scope, num_candidates=req.num_candidates, persist_run=True)
     return result
 
 @app.post("/api/backtest", response_model=EvaluationReport)
 def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
-    work = db.query(Work).filter_by(role="target").first()
-    if not work:
-        raise HTTPException(status_code=404, detail="Target work not found")
-
-    from story_forecaster.db.models import WorkVersion
-    latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-    version_id = latest_ver.id if latest_ver else work.id
-
-    target_ch = db.query(Chapter).filter(
-        (Chapter.work_version_id == version_id) if latest_ver else True,
-        Chapter.ordinal == req.cutoff_chapter
-    ).first()
-    if not target_ch:
-        raise HTTPException(status_code=404, detail=f"Chapter {req.cutoff_chapter} not found")
-
-    last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-    max_seq = last_scene.discourse_seq if last_scene else req.cutoff_chapter
+    try:
+        resolved = resolve_scope(db, cutoff_chapter=req.cutoff_chapter)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     hidden_chapter_num = req.cutoff_chapter + 1
     try:
@@ -220,13 +159,6 @@ def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    scope = ForecastScope(
-        project_id=work.project_id,
-        target_work_version_id=version_id,
-        target_max_discourse_seq=max_seq,
-        mode="retrospective"
-    )
-
     try:
         from story_forecaster.providers import get_provider, ProviderUnavailableError
         provider = get_provider(provider_name=req.provider_name)
@@ -234,7 +166,7 @@ def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
     engine = ForecastEngine(provider=provider)
-    result = engine.run_forecast(scope=scope, num_candidates=3, persist_run=True)
+    result = engine.run_forecast(scope=resolved.scope, num_candidates=3, persist_run=True)
 
     evaluator = BacktestEvaluator()
     report = evaluator.evaluate_forecast(result, gold, cutoff_chapter=req.cutoff_chapter)
@@ -242,33 +174,13 @@ def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
 
 @app.get("/api/memory/snapshot")
 def get_memory_snapshot(cutoff_chapter: int = Query(23, ge=1, le=1000), db: Session = Depends(get_db)):
-    work = db.query(Work).filter_by(role="target").first()
-    if not work:
-        raise HTTPException(status_code=404, detail="Target work not found")
-
-    from story_forecaster.db.models import WorkVersion
-    latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-    version_id = latest_ver.id if latest_ver else work.id
-
-    target_ch = db.query(Chapter).filter(
-        (Chapter.work_version_id == version_id) if latest_ver else True,
-        Chapter.ordinal == cutoff_chapter
-    ).first()
-    if not target_ch:
-        raise HTTPException(status_code=404, detail=f"Chapter {cutoff_chapter} not found")
-
-    last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-    max_seq = last_scene.discourse_seq if last_scene else cutoff_chapter
-
-    scope = ForecastScope(
-        project_id=work.project_id,
-        target_work_version_id=version_id,
-        target_max_discourse_seq=max_seq,
-        mode="retrospective"
-    )
+    try:
+        resolved = resolve_scope(db, cutoff_chapter=cutoff_chapter)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     mem_engine = NarrativeMemoryEngine()
-    snapshot = mem_engine.get_snapshot(scope)
+    snapshot = mem_engine.get_snapshot(resolved.scope)
     return snapshot.model_dump()
 
 @app.get("/api/author/precedents")

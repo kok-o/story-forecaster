@@ -28,6 +28,7 @@ from story_forecaster.db import SessionLocal, Project, Work, WorkVersion, Chapte
 from story_forecaster.domain.scope import ForecastScope
 from story_forecaster.providers import get_provider, ProviderUnavailableError
 from story_forecaster.config import get_settings
+from story_forecaster.domain.resolver import resolve_scope
 
 app = typer.Typer(help="Story Forecaster CLI for Author N.B. and 'Система Абсолютного З.Л.А.'")
 console = Console()
@@ -168,13 +169,16 @@ def inspect(
     """Inspects indexed chapters, scenes, and current plot status."""
     db = SessionLocal()
     try:
-        work = db.query(Work).filter_by(role="target").first()
-        if not work:
-            console.print("[red]No target work found. Run 'python -m story_forecaster.cli ingest' first.[/red]")
+        try:
+            resolved = resolve_scope(db)
+        except ValueError as e:
+            console.print(f"[red]No target work found: {e}. Run 'python -m story_forecaster.cli ingest' first.[/red]")
             return
 
-        chapters = db.query(Chapter).order_by(Chapter.ordinal).all()
-        table = Table(title=f"{work.title} ({work.author_name}) - Оглавление и сцены")
+        work = resolved.work
+        version = resolved.version
+        chapters = db.query(Chapter).filter_by(work_version_id=version.id).order_by(Chapter.ordinal).all()
+        table = Table(title=f"{work.title} ({work.author_name}) [версия {version.id[:8]}] - Оглавление и сцены")
         table.add_column("№", justify="right", style="cyan")
         table.add_column("Заголовок", style="white")
         table.add_column("Символов", justify="right", style="green")
@@ -199,38 +203,18 @@ def forecast(
     """Generates 3-5 prospective chapter candidates honoring zero-leakage scope."""
     db = SessionLocal()
     try:
-        work = db.query(Work).filter_by(role="target").first()
-        if not work:
-            console.print("[red]No target work found. Run 'ingest' first.[/red]")
+        try:
+            resolved = resolve_scope(db, cutoff_chapter=cutoff_chapter)
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
             return
 
-        latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-        version_id = latest_ver.id if latest_ver else work.id
-
-        # Find the max discourse_seq for the requested cutoff_chapter in this version
-        target_ch = db.query(Chapter).filter(
-            (Chapter.work_version_id == version_id) if latest_ver else True,
-            Chapter.ordinal == cutoff_chapter
-        ).first()
-        if not target_ch:
-            console.print(f"[red]Chapter {cutoff_chapter} not found.[/red]")
-            return
-
-        last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-        max_seq = last_scene.discourse_seq if last_scene else cutoff_chapter
-
-        scope = ForecastScope(
-            project_id=work.project_id,
-            target_work_version_id=version_id,
-            target_max_discourse_seq=max_seq,
-            mode="retrospective"
-        )
-
+        scope = resolved.scope
         console.print(Panel.fit(
             f"[bold cyan]Story Forecaster Engine[/bold cyan]\n"
-            f"Произведение: [yellow]{work.title}[/yellow]\n"
-            f"Версия: [cyan]{version_id}[/cyan]\n"
-            f"Точка отсечки: [green]Конец главы {cutoff_chapter} (discourse_seq <= {max_seq})[/green]\n"
+            f"Произведение: [yellow]{resolved.work.title}[/yellow]\n"
+            f"Версия: [cyan]{resolved.version.id}[/cyan]\n"
+            f"Точка отсечки: [green]Конец главы {cutoff_chapter} (discourse_seq <= {resolved.max_discourse_seq})[/green]\n"
             f"Провайдер: [magenta]{provider_name}[/magenta]",
             border_style="cyan"
         ))
@@ -307,41 +291,21 @@ def search(
     """Executes a hybrid BM25 + dense search over permitted story scenes with strict zero future leakage."""
     db = SessionLocal()
     try:
-        work = db.query(Work).filter_by(role="target").first()
-        if not work:
-            console.print("[red]No target work found. Run 'ingest' first.[/red]")
+        try:
+            resolved = resolve_scope(db, cutoff_chapter=cutoff_chapter)
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
             return
-
-        latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-        version_id = latest_ver.id if latest_ver else work.id
-
-        target_ch = db.query(Chapter).filter(
-            (Chapter.work_version_id == version_id) if latest_ver else True,
-            Chapter.ordinal == cutoff_chapter
-        ).first()
-        if not target_ch:
-            console.print(f"[red]Chapter {cutoff_chapter} not found.[/red]")
-            return
-
-        last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-        max_seq = last_scene.discourse_seq if last_scene else cutoff_chapter
-
-        scope = ForecastScope(
-            project_id=work.project_id,
-            target_work_version_id=version_id,
-            target_max_discourse_seq=max_seq,
-            mode="retrospective"
-        )
 
         from story_forecaster.retrieval import HybridRetrievalEngine
         engine = HybridRetrievalEngine(db_session=db)
-        results = engine.search(query=query, scope=scope, top_k=top_k)
+        results = engine.search(query=query, scope=resolved.scope, top_k=top_k)
 
         console.print(Panel.fit(
             f"[bold cyan]Hybrid Scope Search[/bold cyan]\n"
             f"Запрос: [yellow]{query}[/yellow]\n"
-            f"Версия: [cyan]{version_id}[/cyan]\n"
-            f"Граница отсечки: [green]Конец главы {cutoff_chapter} (discourse_seq <= {max_seq})[/green]\n"
+            f"Версия: [cyan]{resolved.version.id}[/cyan]\n"
+            f"Граница отсечки: [green]Конец главы {cutoff_chapter} (discourse_seq <= {resolved.max_discourse_seq})[/green]\n"
             f"Найдено релевантных сцен: [magenta]{len(results)}[/magenta]",
             border_style="cyan"
         ))
@@ -374,24 +338,11 @@ def backtest(
     """Executes a blind backtest comparing forecasted candidates against held-out gold chapter events."""
     db = SessionLocal()
     try:
-        work = db.query(Work).filter_by(role="target").first()
-        if not work:
-            console.print("[red]No target work found. Run 'ingest' first.[/red]")
+        try:
+            resolved = resolve_scope(db, cutoff_chapter=cutoff_chapter)
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
             return
-
-        latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
-        version_id = latest_ver.id if latest_ver else work.id
-
-        target_ch = db.query(Chapter).filter(
-            (Chapter.work_version_id == version_id) if latest_ver else True,
-            Chapter.ordinal == cutoff_chapter
-        ).first()
-        if not target_ch:
-            console.print(f"[red]Chapter {cutoff_chapter} not found.[/red]")
-            return
-
-        last_scene = db.query(Scene).filter_by(chapter_id=target_ch.id).order_by(Scene.discourse_seq.desc()).first()
-        max_seq = last_scene.discourse_seq if last_scene else cutoff_chapter
 
         hidden_chapter_num = cutoff_chapter + 1
         from story_forecaster.evaluation import get_gold_chapter, BacktestEvaluator
@@ -401,18 +352,11 @@ def backtest(
             console.print(f"[red]Error: {e}[/red]")
             return
 
-        scope = ForecastScope(
-            project_id=work.project_id,
-            target_work_version_id=version_id,
-            target_max_discourse_seq=max_seq,
-            mode="retrospective"
-        )
-
         console.print(Panel.fit(
             f"[bold cyan]Story Forecaster Backtest Benchmark[/bold cyan]\n"
-            f"Произведение: [yellow]{work.title}[/yellow]\n"
-            f"Версия: [cyan]{version_id}[/cyan]\n"
-            f"Граница разрешенного контекста: [green]Конец главы {cutoff_chapter} (discourse_seq <= {max_seq})[/green]\n"
+            f"Произведение: [yellow]{resolved.work.title}[/yellow]\n"
+            f"Версия: [cyan]{resolved.version.id}[/cyan]\n"
+            f"Граница разрешенного контекста: [green]Конец главы {cutoff_chapter} (discourse_seq <= {resolved.max_discourse_seq})[/green]\n"
             f"Скрытая тестируемая глава: [bold magenta]Глава {hidden_chapter_num}[/bold magenta]\n"
             f"Провайдер: [magenta]{provider_name}[/magenta]",
             border_style="cyan"
@@ -426,7 +370,7 @@ def backtest(
             raise typer.Exit(code=1)
 
         engine = ForecastEngine(provider=provider)
-        result = engine.run_forecast(scope=scope, num_candidates=3, persist_run=True)
+        result = engine.run_forecast(scope=resolved.scope, num_candidates=3, persist_run=True)
 
         evaluator = BacktestEvaluator()
         report = evaluator.evaluate_forecast(result, gold, cutoff_chapter=cutoff_chapter)

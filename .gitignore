@@ -47,7 +47,9 @@ scratch/
 NB - */
 NB-*/
 
-# SQLite temporary journal/wal locks
+# SQLite temporary journal/wal locks and backups
 *.db-journal
 *.db-wal
 *.db-shm
+*.bak.db
+data/backups/
