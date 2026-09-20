@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "story-forecaster"
-version = "0.1.0"
-description = "Leak-free narrative forecasting engine for ongoing serialized fiction"
+version = "1.0.0"
+description = "Leak-free narrative forecasting and fanfic continuation engine for ongoing serialized fiction"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
