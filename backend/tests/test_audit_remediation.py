@@ -516,4 +516,159 @@ def test_context_builder_strict_budget_truncation_p2_11(clean_db, synthetic_proj
         assert doc.char_count <= 10
 
 
+def test_evaluator_optimal_bipartite_matching_p2_13():
+    """P2-13: StoryEvaluator uses optimal maximum-weight bipartite matching, resolving greedy pitfalls."""
+    from story_forecaster.evaluation.evaluator import StoryEvaluator
+    from story_forecaster.evaluation.schemas import GoldChapterData, EventUnit
+    from story_forecaster.domain.forecast import PredictionCandidate, ChapterTopology, NarrativeMode, PlotBeat
 
+    # Setup the exact audit counterexample matrix:
+    # Gold 1: Fairy blackmail on the market
+    # Gold 2: Kazuma recruitment & contract
+    gold = GoldChapterData(
+        chapter_ordinal=25,
+        title="Глава 25",
+        pov_character="Хачиман",
+        narrative_mode="POLITICS",
+        key_events=[
+            EventUnit(
+                actor="Фея",
+                action="проводит шантаж и требует пыльцу",
+                target="Кадзума на ярмарке",
+                outcome="Кадзума вынужден уступить шантажу",
+                salience=1.0,
+                polarity=True
+            ),
+            EventUnit(
+                actor="Хачиман",
+                action="заключает контракт и призыв Сато Кадзумы",
+                target="Сато Кадзума",
+                outcome="Кадзума завербован в команду",
+                salience=1.0,
+                polarity=True
+            ),
+        ]
+    )
+
+    # Candidate Beats:
+    # Beat 1: Matches Gold 1 (Fairy 1.0) and Gold 2 (Kazuma contract 1.0)
+    # Beat 2: Matches Gold 1 partially (Fairy 0.5) and Gold 2 (0.0)
+    candidate = PredictionCandidate(
+        candidate_id="cand_opt",
+        title="Optimal Matching Candidate",
+        topology=ChapterTopology(pov_character="Хачиман", narrative_mode=NarrativeMode.POLITICS),
+        key_events=[
+            PlotBeat(ordinal=1, summary="Кадзума заключает контракт и призыв, пока фея угрожает шантажом на ярмарке", participants=["Хачиман", "Кадзума", "Фея"]),
+            PlotBeat(ordinal=2, summary="Маленькая фея летает над ярмаркой осколков", participants=["Фея"])
+        ],
+        rationale="Bipartite test"
+    )
+
+    evaluator = StoryEvaluator()
+    metrics = evaluator.evaluate_candidate(candidate, gold)
+
+    # Weight matrix is [[1.0, 0.5], [1.0, 0.0]]
+    # Greedy order might take (Gold 1, Beat 1) -> 1.0, leaving (Gold 2, Beat 2) -> 0.0, total weight = 1.0
+    # Optimal bipartite matching takes (Gold 2, Beat 1) -> 1.0 and (Gold 1, Beat 2) -> 0.5, total weight = 1.5!
+    total_matched_weight = sum(m.weight for m in metrics.matches)
+    assert total_matched_weight == 1.5
+    assert metrics.event_precision == 0.75
+    assert metrics.event_recall == 0.75
+    assert metrics.event_f1 == 0.75
+    assert len(metrics.matches) == 2
+
+
+def test_evaluator_general_negation_safeguard_p2_13():
+    """P2-13: StoryEvaluator detects contradiction and assigns 0.0 if key elements are negated/destroyed."""
+    from story_forecaster.evaluation.evaluator import StoryEvaluator
+    from story_forecaster.evaluation.schemas import GoldChapterData, EventUnit
+    from story_forecaster.domain.forecast import PredictionCandidate, ChapterTopology, NarrativeMode, PlotBeat
+
+    gold = GoldChapterData(
+        chapter_ordinal=25,
+        title="Глава 25",
+        pov_character="Хачиман",
+        narrative_mode="ACTION",
+        key_events=[
+            EventUnit(
+                actor="Хачиман",
+                action="активирует защитный барьер",
+                target="защитный барьер",
+                outcome="барьер успешно отражает атаку",
+                salience=1.0,
+                polarity=True
+            )
+        ]
+    )
+
+    candidate = PredictionCandidate(
+        candidate_id="cand_neg",
+        title="Negated Candidate",
+        topology=ChapterTopology(pov_character="Хачиман", narrative_mode=NarrativeMode.ACTION),
+        key_events=[
+            PlotBeat(ordinal=1, summary="Защитный барьер полностью уничтожен и разрушен, проект провален", participants=["Хачиман"])
+        ],
+        rationale="Negation check"
+    )
+
+    evaluator = StoryEvaluator()
+    metrics = evaluator.evaluate_candidate(candidate, gold)
+    assert len(metrics.matches) == 0
+    assert metrics.event_f1 == 0.0
+
+
+def test_updater_creates_immutable_version_on_addition_p2_12(clean_db, synthetic_project):
+    """P2-12: IncrementalChapterUpdater creates immutable WorkVersion and invalidates cache on chapter additions."""
+    from story_forecaster.ingestion.updater import IncrementalChapterUpdater
+
+    v1 = synthetic_project["v1"]
+    w1 = synthetic_project["work1"]
+    initial_sha = v1.normalized_sha256
+
+    updater = IncrementalChapterUpdater(db_session=clean_db)
+    result = updater.update_chapter(
+        raw_text="Параграф один новой главы.\n\nПараграф два новой главы с описанием событий.",
+        title="Глава 2. Новые горизонты",
+        ordinal=2,
+        create_new_version_on_edit=True,
+        work_id=w1.id
+    )
+
+    assert result["created_new_version"] is True
+    assert result["work_version_id"] != v1.id
+
+    # Prior version v1 must remain strictly untouched
+    clean_db.refresh(v1)
+    assert v1.normalized_sha256 == initial_sha
+
+    # Target new version has both chapters 1 and 2
+    new_ver_id = result["work_version_id"]
+    chapters = clean_db.query(Chapter).filter_by(work_version_id=new_ver_id).order_by(Chapter.ordinal.asc()).all()
+    assert len(chapters) == 2
+    assert [c.ordinal for c in chapters] == [1, 2]
+
+    # Discourse sequence across all scenes in the new version is strictly contiguous 1..N
+    all_scenes = (
+        clean_db.query(Scene)
+        .join(Chapter, Scene.chapter_id == Chapter.id)
+        .filter(Chapter.work_version_id == new_ver_id)
+        .order_by(Scene.discourse_seq.asc())
+        .all()
+    )
+    assert len(all_scenes) >= 2
+    seqs = [s.discourse_seq for s in all_scenes]
+    assert seqs == list(range(1, len(seqs) + 1))
+
+
+def test_hermetic_suite_data_independence_p2_14(clean_db):
+    """P2-14: Test suite is hermetic and operates reliably without requiring external non-repo files."""
+    from story_forecaster.db.models import Work, Chapter, Scene
+
+    work = clean_db.query(Work).filter_by(role="target").first()
+    assert work is not None
+    assert work.title != ""
+
+    chapters_count = clean_db.query(Chapter).count()
+    scenes_count = clean_db.query(Scene).count()
+    assert chapters_count >= 1
+    assert scenes_count >= 1

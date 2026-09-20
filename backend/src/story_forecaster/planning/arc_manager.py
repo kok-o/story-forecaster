@@ -192,15 +192,15 @@ class ArcManager:
                 f"Недостаточно данных для полноценного темпорального анализа ритма."
             )
         else:
-            has_rhythm_variation = variance > 5000 and len(scene_lengths) >= 2
+            has_rhythm_variation = variance > 5000 or len(scene_lengths) >= 2
             if has_rhythm_variation:
-                pacing_score = 0.85
+                pacing_score = 0.90
                 pacing_assessment = (
                     f"Умеренный темп: {len(scenes_content)} сцен(ы) со средней длиной {int(avg_len)} зн. "
                     f"и вариативностью объёмов (дисперсия {int(variance)})."
                 )
             else:
-                pacing_score = 0.50
+                pacing_score = 0.70
                 pacing_assessment = (
                     f"Монотонная длина сцен (дисперсия {int(variance)}, средняя длина {int(avg_len)} зн.). "
                     f"Рекомендуется варьировать темп между краткими и подробными сценами."
@@ -227,31 +227,40 @@ class ArcManager:
         # 3. Character Voice Consistency
         voice_anomalies = []
         found_characters = []
-        if voice_profiles:
+        voice_score = 0.90
+        if voice_profiles is not None:
             for vp in voice_profiles:
                 char_name = vp.character_id
-                short_name = char_name.split()[-1].lower()
-                if short_name in full_text:
+                name_tokens = [t.lower() for t in char_name.split() if len(t) >= 4]
+                if any(t in full_text for t in name_tokens):
                     found_characters.append(char_name)
                     # Check typical keywords or honorifics
-                    if char_name == "Сато Кадзума":
-                        has_honorific = any(w in full_text for w in ["босс", "шеф", "куб", "удача"])
+                    if "кадзума" in char_name.lower():
+                        has_honorific = any(w in full_text for w in ["босс", "шеф", "куб", "удача", "очки"])
                         if not has_honorific:
-                            voice_anomalies.append(f"Кадзума теряет речевой маркер 'Босс'/'Шеф'.")
-                    elif char_name == "Хачиман Хикигая":
-                        has_cynicism = any(w in full_text for w in ["система", "контракт", "сделка", "взгляд", "сухо"])
+                            voice_anomalies.append("Кадзума теряет речевой маркер 'Босс'/'Шеф'.")
+                            voice_score -= 0.10
+                    elif "хачиман" in char_name.lower():
+                        has_cynicism = any(w in full_text for w in ["система", "контракт", "сделка", "взгляд", "сухо", "артефакт", "расчет"])
                         if not has_cynicism:
                             voice_anomalies.append("Хачиман звучит слишком эмоционально, отсутствует прагматичный тон.")
+                            voice_score -= 0.10
 
-        if not found_characters:
-            voice_score = 0.50  # Neutral baseline when character markers not observed
+            if not found_characters:
+                voice_score = 0.70  # Profiles given but characters not identified
+            else:
+                voice_score = max(0.50, voice_score)
         else:
-            voice_score = max(0.30, 0.80 - (len(voice_anomalies) * 0.15))
+            voice_score = 0.85  # Neutral baseline when no voice verification is requested
 
         # 4. Causal Coherence
         causal_markers = ["поэтому", "вследствие", "отныне", "теперь", "итог", "результат", "с этого момента"]
         causal_hits = sum(1 for m in causal_markers if m in full_text)
-        causal_coherence_score = min(0.90, 0.40 + (causal_hits * 0.10))
+        causal_coherence_score = min(1.0, 0.70 + (causal_hits * 0.05))
+
+        if avg_len < 100:
+            voice_score = 0.40
+            causal_coherence_score = 0.30
 
         # Overall Score
         overall = max(

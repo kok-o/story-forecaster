@@ -38,33 +38,59 @@ class BacktestEvaluator:
                 row.append((weight, rationale))
             cost_matrix.append(row)
 
-        # 3. 1-to-1 matching maximizing total weight
+        # 3. Strict 1-to-1 bipartite maximum weight matching
         matches: List[MatchRecord] = []
         assigned_gold: Set[int] = set()
         assigned_pred: Set[int] = set()
 
-        # Collect all positive candidate pairs and sort descending by weight
-        pairs = []
-        for g_idx in range(len(gold_events)):
-            for p_idx in range(len(pred_beats)):
-                w, r = cost_matrix[g_idx][p_idx]
-                if w > 0.0:
-                    pairs.append((w, g_idx, p_idx, r))
+        if gold_events and pred_beats:
+            try:
+                import numpy as np
+                from scipy.optimize import linear_sum_assignment
 
-        pairs.sort(key=lambda x: x[0], reverse=True)
+                # Build weight matrix [num_gold, num_pred]
+                w_matrix = np.zeros((len(gold_events), len(pred_beats)), dtype=float)
+                for g_i in range(len(gold_events)):
+                    for p_i in range(len(pred_beats)):
+                        w_matrix[g_i, p_i] = cost_matrix[g_i][p_i][0]
 
-        for w, g_idx, p_idx, r in pairs:
-            if g_idx not in assigned_gold and p_idx not in assigned_pred:
-                assigned_gold.add(g_idx)
-                assigned_pred.add(p_idx)
-                matches.append(MatchRecord(
-                    gold_event_idx=g_idx + 1,
-                    candidate_beat_idx=pred_beats[p_idx].ordinal,
-                    gold_summary=f"[{gold_events[g_idx].actor}] {gold_events[g_idx].action} -> {gold_events[g_idx].outcome}",
-                    predicted_summary=pred_beats[p_idx].summary,
-                    weight=w,
-                    rationale=r
-                ))
+                # linear_sum_assignment minimizes, so pass negative weights
+                row_ind, col_ind = linear_sum_assignment(-w_matrix)
+
+                for g_idx, p_idx in zip(row_ind, col_ind):
+                    w, r = cost_matrix[g_idx][p_idx]
+                    if w > 0.0:
+                        assigned_gold.add(g_idx)
+                        assigned_pred.add(p_idx)
+                        matches.append(MatchRecord(
+                            gold_event_idx=g_idx + 1,
+                            candidate_beat_idx=pred_beats[p_idx].ordinal,
+                            gold_summary=f"[{gold_events[g_idx].actor}] {gold_events[g_idx].action} -> {gold_events[g_idx].outcome}",
+                            predicted_summary=pred_beats[p_idx].summary,
+                            weight=w,
+                            rationale=r
+                        ))
+            except ImportError:
+                # Fallback greedy matching if scipy is unavailable
+                pairs = []
+                for g_idx in range(len(gold_events)):
+                    for p_idx in range(len(pred_beats)):
+                        w, r = cost_matrix[g_idx][p_idx]
+                        if w > 0.0:
+                            pairs.append((w, g_idx, p_idx, r))
+                pairs.sort(key=lambda x: x[0], reverse=True)
+                for w, g_idx, p_idx, r in pairs:
+                    if g_idx not in assigned_gold and p_idx not in assigned_pred:
+                        assigned_gold.add(g_idx)
+                        assigned_pred.add(p_idx)
+                        matches.append(MatchRecord(
+                            gold_event_idx=g_idx + 1,
+                            candidate_beat_idx=pred_beats[p_idx].ordinal,
+                            gold_summary=f"[{gold_events[g_idx].actor}] {gold_events[g_idx].action} -> {gold_events[g_idx].outcome}",
+                            predicted_summary=pred_beats[p_idx].summary,
+                            weight=w,
+                            rationale=r
+                        ))
 
         # Sort matches by gold_event_idx for clear reporting
         matches.sort(key=lambda m: m.gold_event_idx)
@@ -203,7 +229,20 @@ class BacktestEvaluator:
         if has_negation:
             # Check if negation contradicts positive gold action/entity
             if gold_event.polarity:
-                # E.g. cube destroyed vs cube acquired/bound
+                # Universal contradiction: check if key nouns from gold target/outcome are negated in prediction
+                target_tokens = [t for t in re.findall(r"\b[а-яёa-z]{4,}\b", gold_event.target.lower())]
+                outcome_tokens = [t for t in re.findall(r"\b[а-яёa-z]{4,}\b", gold_event.outcome.lower())]
+                actor_tokens = [t for t in re.findall(r"\b[а-яёa-z]{4,}\b", gold_event.actor.lower())]
+
+                for tok in target_tokens + outcome_tokens:
+                    if tok in summary_lower and any(w in summary_lower for w in ["уничтожен", "разрушен", "сломан", "невозможн", "провал", "сорван", "потерян", "не удал"]):
+                        return 0.0, f"Противоречие: ключевой целевой элемент '{tok}' объявлен уничтоженным или проваленным"
+
+                for act in actor_tokens:
+                    if act in summary_lower and any(w in summary_lower for w in ["погиб", "убит", "смерть", "ликвидирован"]):
+                        return 0.0, f"Противоречие: ключевой участник '{act}' погиб/ликвидирован в предсказании"
+
+                # Domain-specific safeguards
                 if ("куб" in summary_lower and any(w in summary_lower for w in ["уничтожен", "разрушен", "сломан", "невозможн", "потерян"])):
                     return 0.0, "Противоречие: Куб уничтожен или сломан, что прямо противоречит эталону"
                 if ("крафт" in summary_lower and any(w in summary_lower for w in ["невозможн", "провал", "сорван", "запрещен", "не удал"])):
@@ -285,4 +324,7 @@ class BacktestEvaluator:
             return 0.5, f"Частичное совпадение: пересечение ключевых понятий ({total_kw_hits} совпадений)"
 
         return 0.0, "Нет соответствия"
+
+
+StoryEvaluator = BacktestEvaluator
 

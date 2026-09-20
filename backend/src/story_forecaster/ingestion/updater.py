@@ -38,29 +38,34 @@ class IncrementalChapterUpdater:
     def _resequence_version_scenes(self, db: Session, version_id: str) -> tuple[str, int]:
         chapters = db.query(Chapter).filter_by(work_version_id=version_id).order_by(Chapter.ordinal.asc()).all()
         current_seq = 1
-        hasher = hashlib.sha256()
+        full_text_parts = []
         for ch in chapters:
-            hasher.update(ch.title.encode("utf-8"))
             scenes = db.query(Scene).filter_by(chapter_id=ch.id).order_by(Scene.ordinal.asc()).all()
             for sc in scenes:
                 sc.discourse_seq = current_seq
                 current_seq += 1
                 if sc.content:
-                    hasher.update(sc.content.encode("utf-8"))
-        return hasher.hexdigest(), current_seq - 1
+                    full_text_parts.append(sc.content)
+        canonical_text = "\n\n".join(full_text_parts)
+        canonical_sha = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
+        return canonical_sha, current_seq - 1
 
     def update_chapter(
         self,
         raw_text: str,
         title: Optional[str] = None,
         ordinal: Optional[int] = None,
-        create_new_version_on_edit: bool = True
+        create_new_version_on_edit: bool = True,
+        work_id: Optional[str] = None
     ) -> Dict[str, Any]:
         db = self._get_db()
         should_close = self._external_session is None
 
         try:
-            work = db.query(Work).filter_by(role="target").first()
+            if work_id:
+                work = db.query(Work).filter_by(id=work_id).first()
+            else:
+                work = db.query(Work).filter_by(role="target").first()
             if not work:
                 raise ValueError("Target work not initialized in database")
 
@@ -79,8 +84,8 @@ class IncrementalChapterUpdater:
             existing_ch = db.query(Chapter).filter_by(work_version_id=latest_ver.id, ordinal=target_ordinal).first()
             created_new_version = False
 
-            if existing_ch and create_new_version_on_edit:
-                # Modifying an existing chapter: spawn a new WorkVersion to preserve historical immutability
+            if create_new_version_on_edit:
+                # Spawn a new WorkVersion to guarantee historical version immutability
                 new_ver = WorkVersion(
                     work_id=work.id,
                     original_sha256=text_hash,
@@ -92,11 +97,12 @@ class IncrementalChapterUpdater:
                 target_ver = new_ver
                 created_new_version = True
 
-                # Clone all chapters from latest_ver
+                # Clone all previous chapters
                 old_chapters = db.query(Chapter).filter_by(work_version_id=latest_ver.id).order_by(Chapter.ordinal.asc()).all()
+                found_in_old = False
                 for old_c in old_chapters:
                     if old_c.ordinal == target_ordinal:
-                        # Insert updated chapter
+                        found_in_old = True
                         ch_to_add = Chapter(
                             work_version_id=target_ver.id,
                             ordinal=target_ordinal,
@@ -110,7 +116,7 @@ class IncrementalChapterUpdater:
                             sc = Scene(
                                 chapter_id=ch_to_add.id,
                                 ordinal=span.ordinal,
-                                discourse_seq=0,  # will be resequenced
+                                discourse_seq=0,
                                 start_char=span.start_char,
                                 end_char=span.end_char,
                                 summary=span.content[:150].replace("\n", " ") + "...",
@@ -132,13 +138,36 @@ class IncrementalChapterUpdater:
                             cloned_s = Scene(
                                 chapter_id=cloned_c.id,
                                 ordinal=old_s.ordinal,
-                                discourse_seq=0,  # will be resequenced
+                                discourse_seq=0,
                                 start_char=old_s.start_char,
                                 end_char=old_s.end_char,
                                 summary=old_s.summary,
                                 content=old_s.content
                             )
                             db.add(cloned_s)
+
+                if not found_in_old:
+                    # New chapter appended at the end
+                    ch_to_add = Chapter(
+                        work_version_id=target_ver.id,
+                        ordinal=target_ordinal,
+                        title=target_title,
+                        char_count=len(normalized_text),
+                        source_file=f"chapter_{target_ordinal:02d}.txt"
+                    )
+                    db.add(ch_to_add)
+                    db.flush()
+                    for span in spans:
+                        sc = Scene(
+                            chapter_id=ch_to_add.id,
+                            ordinal=span.ordinal,
+                            discourse_seq=0,
+                            start_char=span.start_char,
+                            end_char=span.end_char,
+                            summary=span.content[:150].replace("\n", " ") + "...",
+                            content=span.content
+                        )
+                        db.add(sc)
             else:
                 target_ver = latest_ver
                 if existing_ch:
@@ -173,6 +202,12 @@ class IncrementalChapterUpdater:
             db.flush()
             version_sha256, max_seq = self._resequence_version_scenes(db, target_ver.id)
             target_ver.normalized_sha256 = version_sha256
+
+            # Invalidate retrieval engine caches
+            from story_forecaster.retrieval.engine import HybridRetrievalEngine
+            HybridRetrievalEngine.clear_cache(version_id=target_ver.id)
+            if created_new_version:
+                HybridRetrievalEngine.clear_cache(version_id=latest_ver.id)
 
             # Determine discourse_seq bounds for the updated chapter
             target_ch = db.query(Chapter).filter_by(work_version_id=target_ver.id, ordinal=target_ordinal).first()

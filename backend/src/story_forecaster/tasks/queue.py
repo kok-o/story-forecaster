@@ -123,8 +123,11 @@ class TaskQueue:
             return task
 
         # Explicit Handler Registry
-        SUPPORTED_HANDLERS = {"BATCH_TEST", "DEMO_BATCH_SIMULATION", "DRAFT_SCENE", "EDITORIAL_REVIEW"}
-        if task.task_type not in SUPPORTED_HANDLERS:
+        SUPPORTED_HANDLERS = {
+            "BATCH_TEST", "DEMO_BATCH_SIMULATION", "DRAFT_SCENE", "EDITORIAL_REVIEW",
+            "FORECAST_BATCH", "ARC_SYNTHESIS", "ABLATION_RUN"
+        }
+        if task.task_type.upper() not in SUPPORTED_HANDLERS:
             task.status = "FAILED"
             task.error_message = f"Unsupported task_type: '{task.task_type}'. No registered handler found."
             session.commit()

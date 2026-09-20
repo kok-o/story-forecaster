@@ -57,6 +57,16 @@ class HybridRetrievalEngine:
     # Class-level cache: (work_version_id, cutoff_seq) -> (BM25Index, Dict[str, SearchChunk])
     _cache: Dict[Tuple[str, int], Tuple[BM25Index, Dict[str, SearchChunk]]] = {}
 
+    @classmethod
+    def clear_cache(cls, version_id: Optional[str] = None):
+        """Invalidates BM25 retrieval cache either entirely or for a specific work version."""
+        if version_id is None:
+            cls._cache.clear()
+        else:
+            keys_to_del = [k for k in cls._cache if k[0] == version_id]
+            for k in keys_to_del:
+                cls._cache.pop(k, None)
+
     def __init__(self, db_session: Optional[Session] = None, chunk_size: int = 1500, chunk_overlap: int = 200):
         self._external_session = db_session
         self.chunk_size = chunk_size
@@ -70,10 +80,6 @@ class HybridRetrievalEngine:
     def _get_db(self) -> Session:
         return self._external_session if self._external_session else SessionLocal()
 
-    @classmethod
-    def clear_cache(cls) -> None:
-        """Clears the cached indexes."""
-        cls._cache.clear()
 
     def _chunk_scene(self, sc: Scene, ch: Chapter) -> List[SearchChunk]:
         """Partitions a scene into search chunks with precise coordinates."""

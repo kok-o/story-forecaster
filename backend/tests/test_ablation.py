@@ -28,7 +28,8 @@ def test_live_ablation_benchmark_runs():
     report = bench.run_benchmark(cutoff_chapter=22, execute_live=True)
     assert report.test_chapter == 23
     assert len(report.runs) == 4
-    assert report.is_synthetic_demonstration is False
+    # Finding P1-08: Even with execute_live=True, DemoProvider is honestly flagged as synthetic demonstration
+    assert report.is_synthetic_demonstration is True
     for r in report.runs:
         assert 0.0 <= r.best_f1 <= 1.0
 
