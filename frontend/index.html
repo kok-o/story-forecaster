@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Story Forecaster — «Система Абсолютного З.Л.А.» (N.B.)</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-icon">SF</div>
+      <div>
+        <h1 class="brand-title">Story Forecaster Engine</h1>
+        <div class="brand-meta" id="header-work-info">«Система Абсолютного З.Л.А.» • Автор: N.B.</div>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-green" id="badge-status">● Готов к работе</span>
+      <span class="badge badge-cyan" id="badge-chapters">23 главы • 1 069 178 знаков</span>
+      <span class="badge badge-purple" id="badge-corpus">13 книг мета-корпуса</span>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="nav-tabs">
+    <button class="tab-btn active" id="tab-btn-forecast" onclick="switchTab('forecast')">🎯 Прогноз Главы 24</button>
+    <button class="tab-btn" id="tab-btn-backtest" onclick="switchTab('backtest')">🧪 Слепой бэктест (Гл. 23)</button>
+    <button class="tab-btn" id="tab-btn-search" onclick="switchTab('search')">🔍 Гибридный поиск (BM25)</button>
+    <button class="tab-btn" id="tab-btn-canon" onclick="switchTab('canon')">📜 5-Статусный Канон HOTD</button>
+    <button class="tab-btn" id="tab-btn-precedents" onclick="switchTab('precedents')">📚 Тропы автора N.B. (~20М зн.)</button>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- Tab 1: Forecast -->
+    <section class="tab-content active" id="tab-forecast">
+      <div class="control-bar">
+        <div class="control-group">
+          <label for="forecast-cutoff-select" style="font-weight: 600; color: var(--text-secondary);">Точка отсечки:</label>
+          <select id="forecast-cutoff-select" class="input-field">
+            <option value="24" selected>Глава 24 (discourse_seq &le; 193, прогноз Главы 25)</option>
+            <option value="23">Глава 23 (прогноз Главы 24)</option>
+            <option value="22">Глава 22 (перед призывом Кадзумы)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="forecast-provider-select" style="font-weight: 600; color: var(--text-secondary);">Провайдер:</label>
+          <select id="forecast-provider-select" class="input-field">
+            <option value="demo" selected>Demo Provider (шаблоны сценариев)</option>
+            <option value="gemini">Google Gemini 3.8 Flash</option>
+          </select>
+        </div>
+        <button id="btn-run-forecast" class="btn-primary" onclick="loadForecast()">⚡ Сгенерировать гипотезы главы</button>
+      </div>
+
+      <!-- Candidate Grid -->
+      <div id="forecast-candidates-container" class="candidate-grid">
+        <div style="color: var(--text-secondary); text-align: center; grid-column: 1/-1; padding: 3rem;">
+          Нажмите «Сгенерировать гипотезы главы» для прогноза...
+        </div>
+      </div>
+
+      <!-- Prose Reader -->
+      <div class="prose-section" id="prose-reader-section" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h2 style="font-size: 1.4rem; color: var(--accent-cyan);" id="prose-title">📖 Художественный образец (референсный драфт)</h2>
+          <span class="badge badge-yellow" id="prose-badge">Статический образец драфта (не LLM)</span>
+        </div>
+        <div class="prose-content" id="prose-content-body"></div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Backtest -->
+    <section class="tab-content" id="tab-backtest">
+      <div class="control-bar">
+        <div class="control-group">
+          <label for="backtest-cutoff-select" style="font-weight: 600; color: var(--text-secondary);">Тестовая отсечка:</label>
+          <select id="backtest-cutoff-select" class="input-field">
+            <option value="22" selected>Глава 22 (скрыта Глава 23)</option>
+          </select>
+        </div>
+        <button id="btn-run-backtest" class="btn-primary" onclick="loadBacktest()">🧪 Запустить слепой бэктест</button>
+      </div>
+
+      <!-- Backtest Metrics Banner -->
+      <div id="backtest-metrics-banner" style="display: none; margin-bottom: 2rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div style="background: var(--bg-card); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Best@1 F1</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-green);" id="metric-best-f1">-</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Event Recall</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-cyan);" id="metric-recall">-</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Event Precision</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-purple);" id="metric-precision">-</div>
+          </div>
+          <div style="background: var(--bg-card); padding: 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Oracle@3 F1</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: var(--accent-yellow);" id="metric-oracle-f1">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Matching Table -->
+      <div id="backtest-table-container"></div>
+    </section>
+
+    <!-- Tab 3: Search -->
+    <section class="tab-content" id="tab-search">
+      <div class="control-bar">
+        <div class="control-group" style="flex: 1; max-width: 600px;">
+          <input type="text" id="search-input" class="input-field" style="width: 100%;" placeholder="Введите поисковый запрос (напр. Хорадримский Куб, пыльца фей, Мэрон)..." value="Хорадримский Куб">
+        </div>
+        <div class="control-group">
+          <label for="search-cutoff-select" style="font-size: 0.85rem; color: var(--text-secondary);">Отсечка:</label>
+          <select id="search-cutoff-select" class="input-field">
+            <option value="23" selected>Глава 23</option>
+            <option value="18">Глава 18 (до Куба)</option>
+          </select>
+          <button id="btn-run-search" class="btn-primary" onclick="loadSearch()">🔍 Искать</button>
+        </div>
+      </div>
+
+      <div id="search-results-container"></div>
+    </section>
+
+    <!-- Tab 4: Canon -->
+    <section class="tab-content" id="tab-canon">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.3rem; margin-bottom: 0.5rem;">5-Статусный Реестр Канона HOTD («Школа Мертвецов»)</h2>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">Ортогональные оси: отношение, свидетельство, причинность, факт свершения.</p>
+      </div>
+      <div id="canon-table-container"></div>
+    </section>
+
+    <!-- Tab 5: Precedents -->
+    <section class="tab-content" id="tab-precedents">
+      <div class="control-bar">
+        <div class="control-group">
+          <label for="precedent-tag-select" style="font-weight: 600; color: var(--text-secondary);">Тег тропа:</label>
+          <select id="precedent-tag-select" class="input-field" onchange="loadPrecedents()">
+            <option value="blackmail_counterattack" selected>blackmail_counterattack (контрудар по шантажистам)</option>
+            <option value="system_exploitation">system_exploitation (поиск багов/лазеек в Системе)</option>
+            <option value="subordinate_utility">subordinate_utility (утилитарное использование подчиненных)</option>
+            <option value="canon_subversion">canon_subversion («канон давай до свидания»)</option>
+            <option value="craft_and_luck">craft_and_luck (крафт, удача и Куб)</option>
+          </select>
+        </div>
+      </div>
+      <div id="precedents-container"></div>
+    </section>
+
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

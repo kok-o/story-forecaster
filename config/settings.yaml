@@ -1,0 +1,60 @@
+app:
+  name: "Story Forecaster"
+  version: "1.0.0"
+  mode: "local"
+  source_language: "ru"
+  default_output_language: "ru"
+  public_access: false
+
+llm:
+  provider: "gemini"
+  model: "gemini-3.8-flash"
+  api_key_env: "GEMINI_API_KEY"
+  concurrency: 2
+  timeout_seconds: 180
+  transport_attempts: 3
+  semantic_repair_attempts: 1
+  task_profiles:
+    reference_classification:
+      thinking: "low"
+      output_cap: 2048
+    extraction:
+      thinking: "medium"
+      output_cap: 8192
+    topology:
+      thinking: "high"
+      output_cap: 8192
+    event_candidates:
+      thinking: "high"
+      output_cap: 12288
+    critique:
+      thinking: "medium"
+      output_cap: 8192
+    prose:
+      thinking: "medium"
+      output_cap: 8192
+
+retrieval:
+  lexical_backend: "bm25"
+  bm25_k1: 1.2
+  bm25_b: 0.75
+  dense_top_k: 30
+  lexical_top_k: 30
+  rerank_pool: 60
+  rrf_k: 60
+  strict_backtest_search: "exact"
+
+forecast:
+  input_soft_cap_tokens: 28000
+  topology_candidates: 3
+  plans_per_topology: 2
+  final_candidates_max: 5
+  min_desired_candidates: 3
+  events_per_candidate_min: 3
+  events_per_candidate_max: 6
+  repair_rounds: 1
+
+evaluation:
+  live_web: false
+  repeated_samples: 3
+  reuse_generation_cache: false

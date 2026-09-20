@@ -1,0 +1,25 @@
+work_key: "target_story"
+title: "Система Абсолютного З.Л.А."
+author_key: "nb_nova"
+author_name: "N.B."
+role: "target"
+format: "text"
+language: "ru"
+series_key: null
+fandoms:
+  - universe_key: "highschool_of_the_dead"
+    continuity_key: "manga_main"
+    role: "primary"
+  - universe_key: "konosuba"
+    continuity_key: "light_novel"
+    role: "crossover"
+  - universe_key: "diablo"
+    continuity_key: "mechanic_horadric_cube"
+    role: "borrowed_mechanic"
+source_path: "data/target/chapters/manifest.json"
+source_url: "https://author.today/reader/618037"
+rights_basis: "user_provided"
+publication_date: "2026-03-01"
+chapter_mapping_path: null
+total_published_chapters: 24
+total_characters: 1118152

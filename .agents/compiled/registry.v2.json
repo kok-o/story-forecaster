@@ -1,0 +1,504 @@
+{
+  "schemaVersion": 2,
+  "compilerVersion": "2.0.0",
+  "sourceGraphHash": "sha256:c15f3691d9ed833630152b65959fdef465d88a7cf5bb27d44a086621e20c89c1",
+  "skills": {
+    "context-manager": {
+      "id": "context-manager",
+      "displayName": "context-manager",
+      "version": "1.0.0",
+      "description": "Smart context selection engine. Analyzes the current task, consults the Project Graph, and returns only the documents and skills needed to prevent token overflow.\n",
+      "category": "general",
+      "type": "instruction-only",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:dba3a018c55b687bf5256592664266affe322ed71b042a4ceed3f07bc30363d7",
+      "resourceTreeHash": "sha256:8743abc29abf19fa93481f09a836d48ec4279030991f3cf6bc2082738c48c54a",
+      "estimatedTokens": 858,
+      "source": ".agents/core/skills/context-manager/skill.yaml",
+      "signals": {
+        "aliases": [
+          "context-manager"
+        ],
+        "keywords": [],
+        "fileGlobs": [],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 50,
+        "estimatedTokens": 858
+      },
+      "resources": [
+        {
+          "path": "EXAMPLES.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "TROUBLESHOOTING.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        },
+        {
+          "path": "references/context-rules.md",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": true,
+      "canonical": "context-os",
+      "rules": []
+    },
+    "context-os": {
+      "id": "context-os",
+      "displayName": "context-os",
+      "version": "1.0.0",
+      "description": "Deterministic context compiler and policy engine for AI coding agents.",
+      "category": "general",
+      "type": "compiler",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:f28a8b6df5cf6d0dc8b32d8e4149f866b59ee11da0c1c050f766a0009674ca86",
+      "resourceTreeHash": "sha256:697cd51226283b147f719e2f4074acb058be1f3fe42714a3babb771e52e26a73",
+      "estimatedTokens": 1227,
+      "source": ".agents/core/skills/context-os/skill.yaml",
+      "signals": {
+        "aliases": [
+          "context-os"
+        ],
+        "keywords": [],
+        "fileGlobs": [],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 50,
+        "estimatedTokens": 1227
+      },
+      "resources": [
+        {
+          "path": "EXAMPLES.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "TROUBLESHOOTING.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        },
+        {
+          "path": "packs.yaml",
+          "mode": "on-demand"
+        },
+        {
+          "path": "references/context-rules.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "references/pipeline.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "references/project-graph.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "rules.yaml",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": false,
+      "canonical": null,
+      "rules": []
+    },
+    "engineering-workflow": {
+      "id": "engineering-workflow",
+      "displayName": "engineering-workflow",
+      "version": "1.0.0",
+      "description": "Senior engineering workflow skill inspired by Addy Osmani's agent-skills. Enforces the full development lifecycle: spec → plan → build → test → review → ship. AI must never write code before a spec and plan are approved.\n",
+      "category": "general",
+      "type": "instruction-only",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:0985a21360cdd796a2f2970b659b6a7a1cdd55672dd35b0292400f9a0092b556",
+      "resourceTreeHash": "sha256:6e2e654c903e1043609c1f7f36980a19c1e20e35bc3fa337ad051293f1e9124c",
+      "estimatedTokens": 3065,
+      "source": ".agents/core/skills/engineering-workflow/skill.yaml",
+      "signals": {
+        "aliases": [
+          "engineering-workflow"
+        ],
+        "keywords": [],
+        "fileGlobs": [],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 50,
+        "estimatedTokens": 3065
+      },
+      "resources": [
+        {
+          "path": "EXAMPLES.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "TROUBLESHOOTING.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": false,
+      "canonical": null,
+      "rules": []
+    },
+    "gemini-precision": {
+      "id": "gemini-precision",
+      "displayName": "gemini-precision",
+      "version": "1.0.0",
+      "description": "High-precision engineering and execution guardrails optimized for Google Gemini models. Enforces zero-assumption file inspection, complete non-lazy implementations, surgical blast-radius containment, and mandatory proof-of-work execution.",
+      "category": "general",
+      "type": "instruction-only",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:677c7229e8b483990cf4b441b990328f5933127a7c449830fe2786cd232321c4",
+      "resourceTreeHash": "sha256:38e0e3e512df2855647a083a6e0ae759a3af613b7f2e2848046b8d6998143539",
+      "estimatedTokens": 1868,
+      "source": ".agents/core/skills/gemini-precision/skill.yaml",
+      "signals": {
+        "aliases": [
+          "gemini-precision"
+        ],
+        "keywords": [],
+        "fileGlobs": [],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 50,
+        "estimatedTokens": 1868
+      },
+      "resources": [
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": false,
+      "canonical": null,
+      "rules": []
+    },
+    "gstack-roles": {
+      "id": "gstack-roles",
+      "displayName": "gstack-roles",
+      "version": "1.0.0",
+      "description": "Role-based AI specialist system inspired by Garry Tan's gstack. Defines 23 specialist roles (CEO, Eng Manager, Designer, QA, Security etc.) and teaches the AI to adopt the correct role before each task phase.\n",
+      "category": "general",
+      "type": "instruction-only",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:faaa89d02bf41416c173e6387e5c9c5065cfe4d82e76c2ae244b77c6cecd3230",
+      "resourceTreeHash": "sha256:f83fba0726700070887643c7e20a0584ba29b0f96c2587bcd834860362ce7a95",
+      "estimatedTokens": 1774,
+      "source": ".agents/core/skills/gstack-roles/skill.yaml",
+      "signals": {
+        "aliases": [
+          "gstack-roles"
+        ],
+        "keywords": [],
+        "fileGlobs": [],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 50,
+        "estimatedTokens": 1774
+      },
+      "resources": [
+        {
+          "path": "EXAMPLES.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "TROUBLESHOOTING.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": true,
+      "canonical": "engineering-workflow",
+      "rules": []
+    },
+    "ponytail-mindset": {
+      "id": "ponytail-mindset",
+      "displayName": "ponytail-mindset",
+      "version": "1.0.0",
+      "description": "Minimalist coding mindset based on DietrichGebert/ponytail. Teaches the AI to write only what is strictly necessary. Uses a 7-rung ladder: YAGNI → reuse → stdlib → platform → deps → one-liner → minimum. Minimizes unnecessary boilerplate and over-engineering while keeping all safety, validation and security guards.\n",
+      "category": "general",
+      "type": "instruction-only",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:122a01d74edfebcfe18e163242a038d61c943f3320b582723eb1a185b6ee53d6",
+      "resourceTreeHash": "sha256:a181af2582fd80a893c52db6a59ceb038c52dbb310fffd99f0f8f7a55a568990",
+      "estimatedTokens": 1812,
+      "source": ".agents/core/skills/ponytail-mindset/skill.yaml",
+      "signals": {
+        "aliases": [
+          "ponytail-mindset"
+        ],
+        "keywords": [],
+        "fileGlobs": [],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 50,
+        "estimatedTokens": 1812
+      },
+      "resources": [
+        {
+          "path": "EXAMPLES.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "TROUBLESHOOTING.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": false,
+      "canonical": null,
+      "rules": []
+    },
+    "security": {
+      "id": "security",
+      "displayName": "Application Security",
+      "version": "1.0.0",
+      "description": "ContextOS skill for Application Security",
+      "category": "backend",
+      "type": "instruction-only",
+      "entrypoint": "SKILL.md",
+      "entrypointHash": "sha256:151bc9080230cdec8e1de9d703d03b739ab0767e24fb2551acd5cf58feb4f3ab",
+      "resourceTreeHash": "sha256:da5be685a6db8c48faeb74722891816960e4b6a86378b680f045a81a204ac572",
+      "estimatedTokens": 1615,
+      "source": ".agents/core/skills/security/skill.yaml",
+      "signals": {
+        "aliases": [
+          "auth",
+          "sec",
+          "security"
+        ],
+        "keywords": [
+          {
+            "value": "security",
+            "weight": 40
+          },
+          {
+            "value": "auth",
+            "weight": 35
+          },
+          {
+            "value": "jwt",
+            "weight": 30
+          },
+          {
+            "value": "csrf",
+            "weight": 30
+          },
+          {
+            "value": "xss",
+            "weight": 30
+          },
+          {
+            "value": "безопасност",
+            "locale": "ru",
+            "weight": 35
+          },
+          {
+            "value": "авториз",
+            "locale": "ru",
+            "weight": 30
+          },
+          {
+            "value": "парол",
+            "locale": "ru",
+            "weight": 30
+          }
+        ],
+        "fileGlobs": [
+          {
+            "value": "**/*auth*",
+            "weight": 25
+          },
+          {
+            "value": "**/*security*",
+            "weight": 25
+          }
+        ],
+        "packages": []
+      },
+      "dependencies": {
+        "requires": [],
+        "optional": [
+          "fastapi",
+          "nestjs",
+          "node"
+        ],
+        "conflicts": []
+      },
+      "context": {
+        "priority": 90,
+        "estimatedTokens": 1615
+      },
+      "resources": [
+        {
+          "path": "EXAMPLES.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "SKILL.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "TROUBLESHOOTING.md",
+          "mode": "on-demand"
+        },
+        {
+          "path": "VALIDATION.json",
+          "mode": "on-demand"
+        },
+        {
+          "path": "security.md",
+          "mode": "on-demand"
+        }
+      ],
+      "deprecated": false,
+      "canonical": null,
+      "rules": [
+        {
+          "id": "SEC-001",
+          "level": "must",
+          "enforcement": "prompt-guidance",
+          "summary": "Always validate and sanitize all user input and untrusted external payloads before processing"
+        },
+        {
+          "id": "SEC-002",
+          "level": "must",
+          "enforcement": "runtime",
+          "checker": "secret-scanner",
+          "summary": "Zero plaintext credentials, private keys, or API tokens committed to repository"
+        },
+        {
+          "id": "SEC-003",
+          "level": "must",
+          "enforcement": "prompt-guidance",
+          "summary": "Enforce authentication and authorization checks prior to accessing sensitive resources or data"
+        }
+      ]
+    }
+  },
+  "aliases": {
+    "auth": "security",
+    "context-manager": "context-manager",
+    "context-os": "context-os",
+    "engineering-workflow": "engineering-workflow",
+    "gemini-precision": "gemini-precision",
+    "gstack-roles": "gstack-roles",
+    "ponytail-mindset": "ponytail-mindset",
+    "sec": "security",
+    "security": "security"
+  },
+  "deprecatedAliases": {
+    "context-manager": "context-os",
+    "gstack-roles": "engineering-workflow"
+  },
+  "packageMap": {},
+  "dependencyGraph": {
+    "context-manager": [],
+    "context-os": [],
+    "engineering-workflow": [],
+    "gemini-precision": [],
+    "gstack-roles": [],
+    "ponytail-mindset": [],
+    "security": []
+  },
+  "rules": {
+    "SEC-001": {
+      "id": "SEC-001",
+      "level": "must",
+      "enforcement": "prompt-guidance",
+      "summary": "Always validate and sanitize all user input and untrusted external payloads before processing",
+      "sourceSkill": "security"
+    },
+    "SEC-002": {
+      "id": "SEC-002",
+      "level": "must",
+      "enforcement": "runtime",
+      "checker": "secret-scanner",
+      "summary": "Zero plaintext credentials, private keys, or API tokens committed to repository",
+      "sourceSkill": "security"
+    },
+    "SEC-003": {
+      "id": "SEC-003",
+      "level": "must",
+      "enforcement": "prompt-guidance",
+      "summary": "Enforce authentication and authorization checks prior to accessing sensitive resources or data",
+      "sourceSkill": "security"
+    }
+  }
+}

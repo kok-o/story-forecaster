@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Virtual Environments
+.env
+.env.*
+!.env.example
+.venv/
+env/
+venv/
+ENV/
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch and ad-hoc scripts
+scratch/
+*.tmp
+*.log
+
+# Raw book source files and copyrighted literary archives (Fair Use & DMCA protection)
+*.fb2
+*.fb2.zip
+*.epub
+NB - */
+NB-*/
+
+# SQLite temporary journal/wal locks
+*.db-journal
+*.db-wal
+*.db-shm

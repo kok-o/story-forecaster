@@ -1,0 +1,429 @@
+{
+  "schemaVersion": 1,
+  "installedPackage": "contextos-agents",
+  "version": "2.0.0",
+  "selectedProfile": "none",
+  "installedAt": "2026-09-19T20:02:19.260Z",
+  "managedFiles": {
+    ".agents/adapters/aider/export.js": {
+      "sha256": "30364b9c4892a45aba591bcf64e0c6e297931a0dd2041511ccf5fd314d9153ca",
+      "managed": true
+    },
+    ".agents/adapters/claude/export.js": {
+      "sha256": "7fd92164c4d0698babb79ede2d09e04d71b595d267413d44513d349bcc8876c5",
+      "managed": true
+    },
+    ".agents/adapters/copilot/export.js": {
+      "sha256": "ee7b332d7e92a23e7018b6a0f0947912b9d1e4749186ebebcd7af8ec5d423a9d",
+      "managed": true
+    },
+    ".agents/adapters/cursor/export.js": {
+      "sha256": "985b4690ee636651f5f4b24c67a0b19f10f01016c65789aadee7953da7a6d069",
+      "managed": true
+    },
+    ".agents/adapters/drift-detector.js": {
+      "sha256": "f0980efc4ae72b239548127d40a13c6dded9dc6d055d524950c83f1d79a916b0",
+      "managed": true
+    },
+    ".agents/adapters/gemini/export.js": {
+      "sha256": "d882d297e354ea45cd0a0f68704d1911f6b99d5d828c89897a0e2abb0bba127b",
+      "managed": true
+    },
+    ".agents/adapters/pure-compiler.js": {
+      "sha256": "e3d17e7f3882724d8d3daf2d4323a92546c8cbee609ddd8b3e737905ca002a56",
+      "managed": true
+    },
+    ".agents/adapters/shared.js": {
+      "sha256": "702a9a7952331ee442bb37649b5462001702c2a0b44071aa636c47afd300a8ce",
+      "managed": true
+    },
+    ".agents/adapters/zed/export.js": {
+      "sha256": "1eae65e3da3d9af819c3991d1bb5a9165e0b777f30fae445e95c935bebcda694",
+      "managed": true
+    },
+    ".agents/AGENTS.md": {
+      "sha256": "8d9eaa0addcf1e6462f7c6be3c299d144ae3c2877747df4b1847634dd5ca986a",
+      "managed": true
+    },
+    ".agents/compiled/registry.v2.json": {
+      "sha256": "400b7c43ffad64c57898c8b9e8257ed4a46992d943f8f8ead5b981cd574d7a26",
+      "managed": true
+    },
+    ".agents/compiled/registry.v2.sha256": {
+      "sha256": "4d03ca5c58c83f669480ede87afe521cc44d9be8bfa1e758ebaf64ebf3af2fc3",
+      "managed": true
+    },
+    ".agents/compiler/manifest-compiler.js": {
+      "sha256": "8c834c68f07429071952449463adb79e4c81a93cbd1a4a68edec5eeed8752ad3",
+      "managed": true
+    },
+    ".agents/compiler/vendor/yaml.js": {
+      "sha256": "f8bda66f9adc0176864b129dfff04f8860919e052c7c1086fb1a385a4e739413",
+      "managed": true
+    },
+    ".agents/compiler/vendor/yaml.LICENSE.txt": {
+      "sha256": "5bba27375d93e9119f76c1015f7672cf9ad5f70952296e0842fb2243d6376869",
+      "managed": true
+    },
+    ".agents/compiler/vendor/yaml.SBOM.json": {
+      "sha256": "c8a255b6400bd74b87f45d30026ddee2d219f0f18a5d66b16fcbb0c0959fb551",
+      "managed": true
+    },
+    ".agents/core/profiles/init.yaml": {
+      "sha256": "cd94e96c1d56cff436d9bb759ecbd8f586f4bc47146d161730ab36cf63c2333e",
+      "managed": true
+    },
+    ".agents/core/skills/context-manager/EXAMPLES.md": {
+      "sha256": "31880adc8b4c001ba2d18e869e965ee40ebf6516e43f7d8f15ffab8ade0b2f7d",
+      "managed": true
+    },
+    ".agents/core/skills/context-manager/references/context-rules.md": {
+      "sha256": "090962a3a26fb2a37d67c3d4fa5260029e41e2cfd4368ba83d15c65d91681839",
+      "managed": true
+    },
+    ".agents/core/skills/context-manager/SKILL.md": {
+      "sha256": "dba3a018c55b687bf5256592664266affe322ed71b042a4ceed3f07bc30363d7",
+      "managed": true
+    },
+    ".agents/core/skills/context-manager/skill.yaml": {
+      "sha256": "446d8ad329569e8654418aa7f2603b16a58926a60a5a3da01b1d95950738759c",
+      "managed": true
+    },
+    ".agents/core/skills/context-manager/TROUBLESHOOTING.md": {
+      "sha256": "b65462139e24666c13e0e4c3bd55916db48cc78a5fb6e09d3c75a971ebf97273",
+      "managed": true
+    },
+    ".agents/core/skills/context-manager/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/EXAMPLES.md": {
+      "sha256": "ef2b31f2489664b3ddbf3a815a13ee863c95cfebed7e236c12e1394c6a0c0737",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/packs.yaml": {
+      "sha256": "029719550cae540407b5b72026ea5e8cd1c24e7914169549c4902e6a84e6999d",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/references/context-rules.md": {
+      "sha256": "12babf2b32e24b1c5ad7a2ebe2d3cfa5059db223951ea081989f234b600f0232",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/references/pipeline.md": {
+      "sha256": "89a77a6ee49256227f1bbd57eecfd0db35192c5f5d4ccf595c53af1f2834030b",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/references/project-graph.md": {
+      "sha256": "d57aded3d49273f357453bf73e57026329339c05bdffbfd2aa01581785570e0e",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/rules.yaml": {
+      "sha256": "56181b148f4bd4fb1d1b5d79fb91cab065afaf413425ca795faa01de98b89c72",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/SKILL.md": {
+      "sha256": "f28a8b6df5cf6d0dc8b32d8e4149f866b59ee11da0c1c050f766a0009674ca86",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/skill.yaml": {
+      "sha256": "d79f722e2553d718544f38ca68bdf99100d42d906a49f94ef4872cb6d660a771",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/TROUBLESHOOTING.md": {
+      "sha256": "c3156d5d290cae112e1a7362f591059ec1f92fb75aacafa1f3ad0c25efaddd59",
+      "managed": true
+    },
+    ".agents/core/skills/context-os/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/core/skills/engineering-workflow/EXAMPLES.md": {
+      "sha256": "d9935f301c02758b499db8c7163516570e9f8c274bfe4de5a046eeadc0ba1352",
+      "managed": true
+    },
+    ".agents/core/skills/engineering-workflow/SKILL.md": {
+      "sha256": "0985a21360cdd796a2f2970b659b6a7a1cdd55672dd35b0292400f9a0092b556",
+      "managed": true
+    },
+    ".agents/core/skills/engineering-workflow/skill.yaml": {
+      "sha256": "c62458a8aa951878c87f2d720331aa6171685f2777c5a39e02bdf06a36f89e52",
+      "managed": true
+    },
+    ".agents/core/skills/engineering-workflow/TROUBLESHOOTING.md": {
+      "sha256": "a15c390c656ed95b4d6fb20c7aa5bbf2cec6f1a72e7a7fc80a120363a45569d1",
+      "managed": true
+    },
+    ".agents/core/skills/engineering-workflow/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/core/skills/gemini-precision/SKILL.md": {
+      "sha256": "677c7229e8b483990cf4b441b990328f5933127a7c449830fe2786cd232321c4",
+      "managed": true
+    },
+    ".agents/core/skills/gemini-precision/skill.yaml": {
+      "sha256": "6806b6360ce5d7e73d02abb1a2a6163d7a1a20723dbdd42c1cbb1ea5c745d74b",
+      "managed": true
+    },
+    ".agents/core/skills/gemini-precision/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/core/skills/gstack-roles/EXAMPLES.md": {
+      "sha256": "c56bc00f75f36f1c3b74c68f545fe48442f4776ba6ac3b08911f329656179932",
+      "managed": true
+    },
+    ".agents/core/skills/gstack-roles/SKILL.md": {
+      "sha256": "faaa89d02bf41416c173e6387e5c9c5065cfe4d82e76c2ae244b77c6cecd3230",
+      "managed": true
+    },
+    ".agents/core/skills/gstack-roles/skill.yaml": {
+      "sha256": "d4a4e57295537602fe01f1db6230ffb97b46f465dc098cda5a1e048efaa9f7ca",
+      "managed": true
+    },
+    ".agents/core/skills/gstack-roles/TROUBLESHOOTING.md": {
+      "sha256": "27df949e1822c89b5927395d1a40a413a48f65758d961bb9955e3a3adaed80de",
+      "managed": true
+    },
+    ".agents/core/skills/gstack-roles/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/core/skills/ponytail-mindset/EXAMPLES.md": {
+      "sha256": "79a027122c04430a85965d857c79436133df3c649c140f4d559f0c16b19c4471",
+      "managed": true
+    },
+    ".agents/core/skills/ponytail-mindset/SKILL.md": {
+      "sha256": "122a01d74edfebcfe18e163242a038d61c943f3320b582723eb1a185b6ee53d6",
+      "managed": true
+    },
+    ".agents/core/skills/ponytail-mindset/skill.yaml": {
+      "sha256": "93944925804c05ee9b61e84ee3bd3a6f9687c78f92ed31e99c72df2246600080",
+      "managed": true
+    },
+    ".agents/core/skills/ponytail-mindset/TROUBLESHOOTING.md": {
+      "sha256": "2e6356a3611c526a7fcb436cc62ee09b62bfd9e1316b4aef5b6c5158b961497c",
+      "managed": true
+    },
+    ".agents/core/skills/ponytail-mindset/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/core/skills/security/EXAMPLES.md": {
+      "sha256": "0fd2ce841f1f7cbd7b3b87a5fe9359334e14ce3110c37e59ac3a14d2faf92b75",
+      "managed": true
+    },
+    ".agents/core/skills/security/security.md": {
+      "sha256": "16ffbf45f5fade9c03593584e4f0a282649955a1e29c0fb852b48255921b5dd3",
+      "managed": true
+    },
+    ".agents/core/skills/security/SKILL.md": {
+      "sha256": "151bc9080230cdec8e1de9d703d03b739ab0767e24fb2551acd5cf58feb4f3ab",
+      "managed": true
+    },
+    ".agents/core/skills/security/skill.yaml": {
+      "sha256": "7d14b70e751b91e83eead49957534e41ccacc8df1d6f4a31b09426d3670439d1",
+      "managed": true
+    },
+    ".agents/core/skills/security/TROUBLESHOOTING.md": {
+      "sha256": "4e74996fcd82fc051ce6f007e661bcbee5b22c98c521ab1b1477ef2dece5c42e",
+      "managed": true
+    },
+    ".agents/core/skills/security/VALIDATION.json": {
+      "sha256": "984562f64676b97da289c0d6ce9931029a27fdb036902e12b905499c892f1b1e",
+      "managed": true
+    },
+    ".agents/ctx.js": {
+      "sha256": "d1256dd8e2e35d379fac127eeb08ca19d2e9bd2f345cb157b4fe11fa41a48a32",
+      "managed": true
+    },
+    ".agents/customization-dx.js": {
+      "sha256": "d3366b3099f00885476553f8328a3e1dc62f144deb9fdb76ed0abee12f194b43",
+      "managed": true
+    },
+    ".agents/doctor.js": {
+      "sha256": "0eb1929c66a064cb6f4a10d31da17516d5a00017763abf32db8610c9b551cdd9",
+      "managed": true
+    },
+    ".agents/filesystem/index.js": {
+      "sha256": "fddadfb74c4a392bd4fca0abff303f9cbe9b5c7da8a78d9053243525d811fadc",
+      "managed": true
+    },
+    ".agents/filesystem/journaled-transaction.js": {
+      "sha256": "7fe7f66e53a8f147a8eaa09e647a4e3d8914f383a1443f95a873ee6a4f57d11c",
+      "managed": true
+    },
+    ".agents/filesystem/lockfile-v2.js": {
+      "sha256": "78eb23ba7ab7fecd26ce160254e3a46f0da6316c66de0a3da8b57a5ca371db53",
+      "managed": true
+    },
+    ".agents/filesystem/platform-hardening.js": {
+      "sha256": "69702859a03fa66b44b1a4119681d0261d9059cf51d3ba3917ba78c0b14b6292",
+      "managed": true
+    },
+    ".agents/filesystem/project-lock.js": {
+      "sha256": "b7d0db16c3642f33a5ee1fcca741e90a08e909d1b4c61fedc9ec2662c71c065c",
+      "managed": true
+    },
+    ".agents/filesystem/safe-path.js": {
+      "sha256": "3cb90cadfbe399abc64a813d006799403c40904de71f34a0870e66daf7875c38",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/context-manager/SKILL.md": {
+      "sha256": "56b52c7f9861465635e98d464b28108810dc4c6d1ce0cf6348a087a3833afcff",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/context-os/SKILL.md": {
+      "sha256": "a0597f514439bb5a10eeeecdc2c1db04d9d9e07f11470780dd4e6bc9f2915f2f",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/engineering-workflow/SKILL.md": {
+      "sha256": "3965d4adb30078f16bac78cdd0314fbfe75b619ebec44e8fde44d540cb87ff3b",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/gemini-precision/SKILL.md": {
+      "sha256": "489a6e0f3e0c4908e458d8373ad0271a42eabc8ffc1a52a2ebfda9981c12b8a2",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/gstack-roles/SKILL.md": {
+      "sha256": "cd852a49098abbacffe8eadd2785973342873856d05b4940744793750fa227e0",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/ponytail-mindset/SKILL.md": {
+      "sha256": "c7f74446c5a9dcc88afaae2ffea82a0adf010d25d492323ccb71953df33694b0",
+      "managed": true
+    },
+    ".agents/generated/claude/skills/security/SKILL.md": {
+      "sha256": "0c4631867cbc73654fea0d7223f0970ce6cf87bb68d9bc1b72b1840f99894f8c",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/context-manager/SKILL.md": {
+      "sha256": "55a66ad83700d0f76165a30728e71c9537027f27ad9be888c2bdabd1d663a71b",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/context-os/SKILL.md": {
+      "sha256": "06cb22603a5408310bac5da7d3aeb53b9b994d81f2c8fc642f858c56d7eb1526",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/engineering-workflow/SKILL.md": {
+      "sha256": "f09048d984c569ff51643e84adabcec16520051ea5e18a43a9ee21e2afdbe949",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/gemini-precision/SKILL.md": {
+      "sha256": "c01bc25cca1a4b4fef44f7fafc818909dd8c523ed6a272595754bff49ea7a1f9",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/gstack-roles/SKILL.md": {
+      "sha256": "b86cc38a682d2ff51244e258eadab65f4aaa0b7742f9cb08d606a76d1aa2854d",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/ponytail-mindset/SKILL.md": {
+      "sha256": "3dcf349c54a9fa4fae4d1221bbe0c4be299938c15ebe0aba58f1b33720d0a8a2",
+      "managed": true
+    },
+    ".agents/generated/gemini/skills/security/SKILL.md": {
+      "sha256": "922c9063f83e60c9c4a0db17ba7cdeaad6682a3dc17bf37944a4d9badc257f90",
+      "managed": true
+    },
+    ".agents/plugins/contextos/hooks.json": {
+      "sha256": "9119079092787b84db313cf07a992950ac0267a503d90e96b52778e0dcf74b7b",
+      "managed": true
+    },
+    ".agents/plugins/contextos/plugin.json": {
+      "sha256": "45286b9d5fd5a5e1cdf8b22d00d56dc059a4aded11285d31a2ddfa4d99ef17d5",
+      "managed": true
+    },
+    ".agents/plugins.js": {
+      "sha256": "0aad1187e8f5cb3a594323864c0e0befe022ff02c21fa1248c280e9423ae3187",
+      "managed": true
+    },
+    ".agents/profiles.js": {
+      "sha256": "733a14b017fd14034f50da45c70b7f5a03c2199e4fc44728fcd39bdeb29954c8",
+      "managed": true
+    },
+    ".agents/resolver/canonical-resolver.js": {
+      "sha256": "f0e379cb6d068bc851e2205171d0cc93fcc3edf433ed09262234db0e34fa521b",
+      "managed": true
+    },
+    ".agents/resolver.js": {
+      "sha256": "714d442a61a75ab3636905883c871453f4e7e7b2c94e00cb5acf46d3dc0527d5",
+      "managed": true
+    },
+    ".agents/rules/rule-catalog.js": {
+      "sha256": "b64018949e6bc92433d79fd41a8e510227050f2549b67991933e3dfd1c57786c",
+      "managed": true
+    },
+    ".agents/schemas/attestation.review.v1.json": {
+      "sha256": "d0141a197d37114a5325b2321ac510f2f4469816b4412465dfeca0eca6695394",
+      "managed": true
+    },
+    ".agents/schemas/attestation.verification.v1.json": {
+      "sha256": "ecbb9065613da6430ec4d19ebc65d20db19ddbbf317ac3d4b82acf754911f314",
+      "managed": true
+    },
+    ".agents/schemas/lockfile.v2.schema.json": {
+      "sha256": "4de693b6868c003895a6bd49b578f996b27d9ad8f53c0372fc1a44b41338981c",
+      "managed": true
+    },
+    ".agents/schemas/profile.v2.schema.json": {
+      "sha256": "6f46ddd4bb40935ee2b07492f94015328efb424f48a00e28732fbda36ec5a0a6",
+      "managed": true
+    },
+    ".agents/schemas/runtime.thread.v1.json": {
+      "sha256": "46f3df1c2e736ac47c78b004b07b89b269f4853593341910bfa2e70b8728969f",
+      "managed": true
+    },
+    ".agents/schemas/skill.manifest.v2.json": {
+      "sha256": "b02b85b99078127a13604151ef0f1db06d852afaa2f3bb0928fa22d271afa60c",
+      "managed": true
+    },
+    ".agents/schemas/verification.spec.v1.json": {
+      "sha256": "1ca914a501f69a5939a2270df0055c342d1399718ce38732a78116bdaaebf95e",
+      "managed": true
+    },
+    ".agents/schemas/workspace.graph.schema.json": {
+      "sha256": "6542349c2c7dfba81f54a93ccbe1bf69c59e1a1f119486538326b15a63229a0e",
+      "managed": true
+    },
+    ".agents/skills-index.json": {
+      "sha256": "8ba3e1f5f89a3545b177405f8af87a1790b9ee20cc4c2a69e4bae56632fe6e92",
+      "managed": true
+    },
+    ".agents/skills.json": {
+      "sha256": "9201fa06686c7d5c5e7bf6450554c04115f10e09491233795dd27d81fb63b510",
+      "managed": true
+    },
+    ".agents/stats.js": {
+      "sha256": "ae871fc9bbae90a7067636891314caeeaf45d59766aee70e69eb021ee0f0b057",
+      "managed": true
+    },
+    ".agents/transaction-core/event-store.js": {
+      "sha256": "6bdcee4db6fb449d8b83f7310cea90764299ed7149b77930ee86270a3820fe99",
+      "managed": true
+    },
+    ".agents/transaction-core/idempotency.js": {
+      "sha256": "81631c49c77012e08bfd4fefd76b21e562d79ca22b4179ce60cdd4fff730eded",
+      "managed": true
+    },
+    ".agents/transaction-core/ipc-lock.js": {
+      "sha256": "b3c171e1d96d94654d76787bddd75c44d0477f6ea833a369486424fb4bdc6aa5",
+      "managed": true
+    },
+    ".agents/transaction-core/plugin-supply-chain-bundle.js": {
+      "sha256": "011a7c9dcb91dc5f368bcf0b0cabac52c305bb5543ce46dc669fae95dd24be75",
+      "managed": true
+    },
+    ".agents/validate.js": {
+      "sha256": "d79b7f79bea9c8d30824d3c1ef292e0d3810b0ed598367ab7e61cb1c621d9d06",
+      "managed": true
+    },
+    ".agents/watch.js": {
+      "sha256": "e0f9a2119b5be6b400b7668df529e2a19b0138059a549055942438f499e52ee4",
+      "managed": true
+    },
+    ".agents/workspace/workspace-graph.js": {
+      "sha256": "3fe193c8561fb0b880764c53a9859b483e96821fba6cdd01c870334b3f993066",
+      "managed": true
+    }
+  }
+}

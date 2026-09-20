@@ -1,0 +1,179 @@
+{
+  "work_id": 618037,
+  "title": "Система Абсолютного З.Л.А.",
+  "author": "N.B.",
+  "url": "https://author.today/work/618037",
+  "total_chapters": 23,
+  "downloaded_at": "2026-09-20 00:43:33",
+  "chapters": [
+    {
+      "num": 1,
+      "id": 5899546,
+      "title": "Глава 01.",
+      "char_count": 43542,
+      "file": "chapter_01.txt"
+    },
+    {
+      "num": 2,
+      "id": 5899593,
+      "title": "Глава 02.",
+      "char_count": 37247,
+      "file": "chapter_02.txt"
+    },
+    {
+      "num": 3,
+      "id": 5909219,
+      "title": "Глава 03.",
+      "char_count": 48771,
+      "file": "chapter_03.txt"
+    },
+    {
+      "num": 4,
+      "id": 5921624,
+      "title": "Глава 04.",
+      "char_count": 47015,
+      "file": "chapter_04.txt"
+    },
+    {
+      "num": 5,
+      "id": 5933148,
+      "title": "Глава 05.",
+      "char_count": 38704,
+      "file": "chapter_05.txt"
+    },
+    {
+      "num": 6,
+      "id": 5947388,
+      "title": "Глава 06.",
+      "char_count": 41208,
+      "file": "chapter_06.txt"
+    },
+    {
+      "num": 7,
+      "id": 5957253,
+      "title": "Глава 07.",
+      "char_count": 47855,
+      "file": "chapter_07.txt"
+    },
+    {
+      "num": 8,
+      "id": 5971194,
+      "title": "Глава 08.",
+      "char_count": 40394,
+      "file": "chapter_08.txt"
+    },
+    {
+      "num": 9,
+      "id": 5985806,
+      "title": "Глава 09.",
+      "char_count": 42949,
+      "file": "chapter_09.txt"
+    },
+    {
+      "num": 10,
+      "id": 5996201,
+      "title": "Глава 10.",
+      "char_count": 47447,
+      "file": "chapter_10.txt"
+    },
+    {
+      "num": 11,
+      "id": 6011039,
+      "title": "Глава 11.",
+      "char_count": 44803,
+      "file": "chapter_11.txt"
+    },
+    {
+      "num": 12,
+      "id": 6029303,
+      "title": "Глава 12.",
+      "char_count": 44841,
+      "file": "chapter_12.txt"
+    },
+    {
+      "num": 13,
+      "id": 6042445,
+      "title": "Глава 13.",
+      "char_count": 46729,
+      "file": "chapter_13.txt"
+    },
+    {
+      "num": 14,
+      "id": 6057762,
+      "title": "Глава 14.",
+      "char_count": 48934,
+      "file": "chapter_14.txt"
+    },
+    {
+      "num": 15,
+      "id": 6073287,
+      "title": "Глава 15.",
+      "char_count": 42976,
+      "file": "chapter_15.txt"
+    },
+    {
+      "num": 16,
+      "id": 6091783,
+      "title": "Глава 16.",
+      "char_count": 43461,
+      "file": "chapter_16.txt"
+    },
+    {
+      "num": 17,
+      "id": 6101000,
+      "title": "Глава 17.",
+      "char_count": 44359,
+      "file": "chapter_17.txt"
+    },
+    {
+      "num": 18,
+      "id": 6115990,
+      "title": "Глава 18.",
+      "char_count": 48536,
+      "file": "chapter_18.txt"
+    },
+    {
+      "num": 19,
+      "id": 6130394,
+      "title": "Глава 19.",
+      "char_count": 48182,
+      "file": "chapter_19.txt"
+    },
+    {
+      "num": 20,
+      "id": 6146025,
+      "title": "Глава 20.",
+      "char_count": 51891,
+      "file": "chapter_20.txt"
+    },
+    {
+      "num": 21,
+      "id": 6160901,
+      "title": "Глава 21.",
+      "char_count": 53827,
+      "file": "chapter_21.txt"
+    },
+    {
+      "num": 22,
+      "id": 6180251,
+      "title": "Глава 22.",
+      "char_count": 58570,
+      "file": "chapter_22.txt"
+    },
+    {
+      "num": 23,
+      "id": 6203209,
+      "title": "Глава 23.",
+      "char_count": 56937,
+      "file": "chapter_23.txt"
+    },
+    {
+      "num": 24,
+      "id": 6274867,
+      "title": "Глава 24.",
+      "char_count": 48974,
+      "file": "chapter_24.txt"
+    }
+  ],
+  "total_chars": 1118152
+}

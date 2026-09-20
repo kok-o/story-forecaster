@@ -1,0 +1,195 @@
+{
+  "txId": "tx-1789848140864-3a0a6053",
+  "state": "COMMITTED",
+  "createdAt": "2026-09-19T20:02:20.865Z",
+  "updatedAt": "2026-09-19T20:02:20.940Z",
+  "completedAt": "2026-09-19T20:02:20.940Z",
+  "operations": [
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/context-manager/SKILL.md",
+      "afterHash": "sha256:55a66ad83700d0f76165a30728e71c9537027f27ad9be888c2bdabd1d663a71b",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\0-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/context-os/SKILL.md",
+      "afterHash": "sha256:06cb22603a5408310bac5da7d3aeb53b9b994d81f2c8fc642f858c56d7eb1526",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\1-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/engineering-workflow/SKILL.md",
+      "afterHash": "sha256:f09048d984c569ff51643e84adabcec16520051ea5e18a43a9ee21e2afdbe949",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\2-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/gemini-precision/SKILL.md",
+      "afterHash": "sha256:c01bc25cca1a4b4fef44f7fafc818909dd8c523ed6a272595754bff49ea7a1f9",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\3-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/gstack-roles/SKILL.md",
+      "afterHash": "sha256:b86cc38a682d2ff51244e258eadab65f4aaa0b7742f9cb08d606a76d1aa2854d",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\4-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/ponytail-mindset/SKILL.md",
+      "afterHash": "sha256:3dcf349c54a9fa4fae4d1221bbe0c4be299938c15ebe0aba58f1b33720d0a8a2",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\5-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/skills/security/SKILL.md",
+      "afterHash": "sha256:922c9063f83e60c9c4a0db17ba7cdeaad6682a3dc17bf37944a4d9badc257f90",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\6-SKILL.md",
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/context-manager/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\7-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/context-manager",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/context-os/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\9-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/context-os",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/engineering-workflow/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\11-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/engineering-workflow",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/gemini-precision/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\13-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/gemini-precision",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/gstack-roles/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\15-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/gstack-roles",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/ponytail-mindset/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\17-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/ponytail-mindset",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "delete",
+      "relativePath": ".agents/generated/claude/skills/security/SKILL.md",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\19-SKILL.md"
+    },
+    {
+      "type": "deleteDir",
+      "relativePath": ".agents/generated/claude/skills/security",
+      "hadExisting": true,
+      "stagedFilePath": null,
+      "backupFilePath": null
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/contextos.lock.json",
+      "afterHash": "sha256:0b038c6cdbc8cae5e052d97e5215f6b60ddc399834155c87ccca1a0bc69fbacc",
+      "expectedBeforeHash": null,
+      "hadExisting": true,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\21-contextos.lock.json",
+      "backupFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\backup\\21-contextos.lock.json"
+    },
+    {
+      "type": "write",
+      "relativePath": ".agents/lockfile.v2.json",
+      "afterHash": "sha256:f71eeb9dcd44ed49dd3ecc6744dae63bc4e87fef8ce7c043596434f84a506fb2",
+      "expectedBeforeHash": null,
+      "hadExisting": false,
+      "stagedFilePath": "C:\\Users\\esenb\\Desktop\\ai\\.agents\\.contextos\\transactions\\tx-1789848140864-3a0a6053\\staging\\22-lockfile.v2.json",
+      "backupFilePath": null
+    }
+  ]
+}

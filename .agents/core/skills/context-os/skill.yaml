@@ -1,0 +1,16 @@
+schemaVersion: 2
+name: context-os
+type: compiler
+description: >-
+  Deterministic context compiler and policy engine for AI coding agents.
+version: 1.0.0
+resources:
+  - EXAMPLES.md
+  - SKILL.md
+  - TROUBLESHOOTING.md
+  - VALIDATION.json
+  - packs.yaml
+  - references/context-rules.md
+  - references/pipeline.md
+  - references/project-graph.md
+  - rules.yaml
