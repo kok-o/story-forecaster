@@ -1,4 +1,4 @@
-from .session import Base, engine, SessionLocal, get_db
+from .session import Base, engine, SessionLocal, get_db, enable_sqlite_foreign_keys
 from .models import (
     Project,
     Work,
@@ -65,6 +65,7 @@ __all__ = [
     "SessionLocal",
     "get_db",
     "init_db",
+    "enable_sqlite_foreign_keys",
     "Project",
     "Work",
     "WorkVersion",

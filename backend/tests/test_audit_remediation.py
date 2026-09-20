@@ -341,3 +341,105 @@ def test_author_precedents_scope_isolation_p1_07():
     res_normal = lib.query_precedents(normal_scope, tags=["fairy_blackmail"])
     assert len(res_normal) >= 1
 
+
+def test_sqlite_foreign_keys_enforced_p2_16():
+    """P2-16: enable_sqlite_foreign_keys guarantees foreign key enforcement in SQLite."""
+    from sqlalchemy import create_engine, text
+    from story_forecaster.db.session import enable_sqlite_foreign_keys
+    from sqlalchemy.exc import IntegrityError
+
+    test_engine = create_engine("sqlite:///:memory:")
+    enable_sqlite_foreign_keys(test_engine)
+
+    with test_engine.connect() as conn:
+        res = conn.execute(text("PRAGMA foreign_keys;")).scalar()
+        assert res == 1, "PRAGMA foreign_keys must be ON"
+
+        # Create parent and child tables to verify integrity enforcement
+        conn.execute(text("CREATE TABLE parent (id TEXT PRIMARY KEY);"))
+        conn.execute(text("CREATE TABLE child (id TEXT PRIMARY KEY, parent_id TEXT REFERENCES parent(id));"))
+        conn.commit()
+
+        # Inserting child with invalid foreign key must raise IntegrityError
+        with pytest.raises(IntegrityError):
+            conn.execute(text("INSERT INTO child (id, parent_id) VALUES ('c1', 'nonexistent');"))
+            conn.commit()
+
+
+def test_api_auth_protection_on_mutating_endpoints_p2_16(clean_db, monkeypatch):
+    """P2-16: Mutating endpoints require authentication when STORY_FORECASTER_API_KEY is configured."""
+    from fastapi.testclient import TestClient
+    from story_forecaster.api.main import app, get_db
+
+    app.dependency_overrides[get_db] = lambda: clean_db
+    client = TestClient(app)
+
+    monkeypatch.setenv("STORY_FORECASTER_API_KEY", "test-secret-key-12345")
+
+    # Mutating request without auth header must be 401 Unauthorized
+    resp_unauth = client.post("/api/tasks", json={"task_type": "DRAFT_SCENE", "params": {}})
+    assert resp_unauth.status_code == 401
+    assert "Invalid or missing API key" in resp_unauth.json()["detail"]
+
+    # Mutating request with incorrect key must be 401
+    resp_wrong = client.post("/api/tasks", json={"task_type": "DRAFT_SCENE", "params": {}}, headers={"X-API-Key": "wrong-key"})
+    assert resp_wrong.status_code == 401
+
+    # Mutating request with valid X-API-Key header succeeds
+    resp_auth = client.post("/api/tasks", json={"task_type": "DRAFT_SCENE", "params": {}}, headers={"X-API-Key": "test-secret-key-12345"})
+    assert resp_auth.status_code == 200
+    assert "task_id" in resp_auth.json()
+
+    # Mutating request with valid Authorization: Bearer token also succeeds
+    resp_bearer = client.post("/api/tasks", json={"task_type": "DRAFT_SCENE", "params": {}}, headers={"Authorization": "Bearer test-secret-key-12345"})
+    assert resp_bearer.status_code == 200
+
+
+def test_api_payload_validation_bounds_p2_16(clean_db):
+    """P2-16: API models enforce strict maximum length bounds preventing DoS via excessive payloads."""
+    from fastapi.testclient import TestClient
+    from story_forecaster.api.main import app, get_db
+
+    app.dependency_overrides[get_db] = lambda: clean_db
+    client = TestClient(app)
+
+    # Oversized scene in editorial review (>50KB) must be rejected with 422
+    giant_scene = "A" * 50001
+    resp_review = client.post("/api/editor/review", json={"chapter_ordinal": 1, "scenes_content": [giant_scene]})
+    assert resp_review.status_code == 422
+    assert "exceeds maximum 50KB limit" in resp_review.text
+
+    # Oversized task params (>64KB) must be rejected with 422
+    giant_params = {"big_payload": "X" * 66000}
+    resp_task = client.post("/api/tasks", json={"task_type": "TEST", "params": giant_params})
+    assert resp_task.status_code == 422
+    assert "exceeds maximum 64KB limit" in resp_task.text
+
+
+def test_api_rate_limiter_p2_16():
+    """P2-16: SlidingWindowRateLimiter throttles requests and raises 429 when limit exceeded."""
+    from fastapi import HTTPException, Request
+    from story_forecaster.api.security import SlidingWindowRateLimiter
+
+    limiter = SlidingWindowRateLimiter(requests_per_window=2, window_seconds=10)
+
+    # Mock request with client host
+    class MockRequest:
+        def __init__(self, ip: str):
+            self.client = type("Client", (), {"host": ip})()
+            self.headers = {}
+
+    req = MockRequest("192.168.1.100")
+
+    # First two requests within window pass
+    assert limiter.check(req) is True
+    assert limiter.check(req) is True
+
+    # Third request within window raises 429
+    with pytest.raises(HTTPException) as exc_info:
+        limiter.check(req)
+    assert exc_info.value.status_code == 429
+    assert "Rate limit exceeded" in exc_info.value.detail
+    assert "Retry-After" in exc_info.value.headers
+
+

@@ -1,11 +1,13 @@
+import json
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Literal
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
+from story_forecaster.api.security import verify_api_key, rate_limit_heavy, rate_limit_default
 from story_forecaster.db.session import SessionLocal
 from story_forecaster.db.models import Work, Chapter, Scene, Run, Candidate
 from story_forecaster.domain.scope import ForecastScope
@@ -130,7 +132,7 @@ def search_scenes(req: SearchRequest, db: Session = Depends(get_db)):
     return engine.search(query=req.query, scope=resolved.scope, top_k=req.top_k)
 
 @app.post("/api/forecast", response_model=ForecastResult)
-def run_forecast(req: ForecastRequest, db: Session = Depends(get_db)):
+def run_forecast(req: ForecastRequest, db: Session = Depends(get_db), _rl: bool = Depends(rate_limit_heavy)):
     try:
         resolved = resolve_scope(db, cutoff_chapter=req.cutoff_chapter)
     except ValueError as e:
@@ -147,7 +149,7 @@ def run_forecast(req: ForecastRequest, db: Session = Depends(get_db)):
     return result
 
 @app.post("/api/backtest", response_model=EvaluationReport)
-def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
+def run_backtest(req: BacktestRequest, db: Session = Depends(get_db), _rl: bool = Depends(rate_limit_heavy)):
     try:
         resolved = resolve_scope(db, cutoff_chapter=req.cutoff_chapter)
     except ValueError as e:
@@ -208,45 +210,66 @@ from story_forecaster.planning.arc_manager import ArcManager
 from story_forecaster.tasks.queue import TaskQueue
 
 class CreateBranchRequest(BaseModel):
-    parent_work_version_id: Optional[str] = None
-    cutoff_discourse_seq: int = Field(182, ge=1)
+    parent_work_version_id: Optional[str] = Field(None, max_length=100)
+    cutoff_discourse_seq: int = Field(182, ge=1, le=100000)
     branch_name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=2000)
 
 class DraftSceneRequest(BaseModel):
-    scene_ordinal: int = Field(..., ge=1)
+    scene_ordinal: int = Field(..., ge=1, le=10000)
     title: str = Field(..., min_length=1, max_length=255)
     plan: ScenePlan
     provider_name: Literal["demo", "gemini"] = "demo"
 
 class RejectSceneRequest(BaseModel):
-    reason: str = Field("Deviation from character or plot constraints", max_length=500)
+    reason: str = Field("Deviation from character or plot constraints", min_length=1, max_length=1000)
 
 class ReviseSceneRequest(BaseModel):
-    new_content: str = Field(..., min_length=10)
+    new_content: str = Field(..., min_length=10, max_length=100000)
     new_plan: Optional[ScenePlan] = None
 
 class RollbackInjuryRequest(BaseModel):
-    character_id: str
-    injury_status: str
+    character_id: str = Field(..., min_length=1, max_length=100)
+    injury_status: str = Field(..., min_length=1, max_length=255)
 
 class CreateArcRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
-    theme: str = Field("Использование Системы Зла и лазеек крафта", max_length=500)
-    core_conflict: str = Field(..., max_length=500)
-    milestones: List[ArcMilestone] = Field(default_factory=list)
-    promises: List[ReaderPromise] = Field(default_factory=list)
-    branch_id: Optional[str] = None
+    theme: str = Field("Использование Системы Зла и лазеек крафта", min_length=1, max_length=500)
+    core_conflict: str = Field(..., min_length=1, max_length=1000)
+    milestones: List[ArcMilestone] = Field(default_factory=list, max_length=50)
+    promises: List[ReaderPromise] = Field(default_factory=list, max_length=50)
+    branch_id: Optional[str] = Field(None, max_length=100)
 
 class EditorialReviewRequest(BaseModel):
-    chapter_ordinal: int = Field(1, ge=1)
-    scenes_content: List[str] = Field(..., min_length=1)
+    chapter_ordinal: int = Field(1, ge=1, le=1000)
+    scenes_content: List[str] = Field(..., min_length=1, max_length=50)
 
+    @field_validator("scenes_content")
+    @classmethod
+    def validate_scenes_size(cls, v: List[str]) -> List[str]:
+        total_len = sum(len(s) for s in v)
+        if total_len > 250000:
+            raise ValueError(f"Total scenes length exceeds maximum 250KB limit (got {total_len} chars).")
+        for idx, s in enumerate(v):
+            if len(s) > 50000:
+                raise ValueError(f"Scene {idx+1} length exceeds maximum 50KB limit (got {len(s)} chars).")
+        return v
 
 class EnqueueTaskRequest(BaseModel):
-    task_type: str = Field(..., min_length=1)
+    task_type: str = Field(..., min_length=1, max_length=100)
     params: Dict[str, Any] = Field(default_factory=dict)
     max_cost_limit_usd: float = Field(0.50, ge=0.01, le=10.0)
+
+    @field_validator("params")
+    @classmethod
+    def validate_params_size(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            serialized = json.dumps(v)
+            if len(serialized) > 65536:
+                raise ValueError("Task params payload exceeds maximum 64KB limit.")
+        except (TypeError, OverflowError):
+            raise ValueError("Task params must be JSON-serializable.")
+        return v
 
 @app.get("/api/writing/branches")
 def list_branches(db: Session = Depends(get_db)):
@@ -267,7 +290,7 @@ def list_branches(db: Session = Depends(get_db)):
     return results
 
 @app.post("/api/writing/branches")
-def create_branch(req: CreateBranchRequest, db: Session = Depends(get_db)):
+def create_branch(req: CreateBranchRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     work = db.query(Work).filter_by(role="target").first()
     proj_id = work.project_id if work else "default"
     ver_id = req.parent_work_version_id
@@ -319,7 +342,7 @@ def list_branch_scenes(branch_id: str, db: Session = Depends(get_db)):
     return results
 
 @app.post("/api/writing/branches/{branch_id}/draft")
-def draft_scene(branch_id: str, req: DraftSceneRequest, db: Session = Depends(get_db)):
+def draft_scene(branch_id: str, req: DraftSceneRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key), _rl: bool = Depends(rate_limit_heavy)):
     service = BranchService()
     try:
         from story_forecaster.providers import get_provider
@@ -351,7 +374,7 @@ def draft_scene(branch_id: str, req: DraftSceneRequest, db: Session = Depends(ge
     }
 
 @app.post("/api/writing/scenes/{scene_id}/accept")
-def accept_scene(scene_id: str, force_override: bool = Query(False), db: Session = Depends(get_db)):
+def accept_scene(scene_id: str, force_override: bool = Query(False), db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     service = BranchService()
     try:
         scene = service.accept_scene(db, scene_id, force_override=force_override)
@@ -363,7 +386,7 @@ def accept_scene(scene_id: str, force_override: bool = Query(False), db: Session
     return {"id": scene.id, "status": scene.status, "message": "Scene accepted successfully."}
 
 @app.post("/api/writing/scenes/{scene_id}/reject")
-def reject_scene(scene_id: str, req: RejectSceneRequest, db: Session = Depends(get_db)):
+def reject_scene(scene_id: str, req: RejectSceneRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     service = BranchService()
     try:
         scene = service.reject_scene(db, scene_id, reason=req.reason)
@@ -372,7 +395,7 @@ def reject_scene(scene_id: str, req: RejectSceneRequest, db: Session = Depends(g
     return {"id": scene.id, "status": scene.status, "message": "Scene rejected; delta quarantined."}
 
 @app.post("/api/writing/scenes/{scene_id}/revise")
-def revise_scene(scene_id: str, req: ReviseSceneRequest, db: Session = Depends(get_db)):
+def revise_scene(scene_id: str, req: ReviseSceneRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     service = BranchService()
     try:
         new_scene, validation, delta = service.revise_scene(
@@ -392,7 +415,7 @@ def revise_scene(scene_id: str, req: ReviseSceneRequest, db: Session = Depends(g
     }
 
 @app.post("/api/writing/branches/{branch_id}/rollback-injury")
-def rollback_injury(branch_id: str, req: RollbackInjuryRequest, db: Session = Depends(get_db)):
+def rollback_injury(branch_id: str, req: RollbackInjuryRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     service = BranchService()
     try:
         healing_scene = service.rollback_injury(
@@ -429,7 +452,7 @@ def list_arcs(db: Session = Depends(get_db)):
     return [{"id": a.id, "title": a.title, "revision_num": a.revision_num, "status": a.status, "plan": a.arc_plan_json} for a in arcs]
 
 @app.post("/api/arcs")
-def create_arc(req: CreateArcRequest, db: Session = Depends(get_db)):
+def create_arc(req: CreateArcRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     work = db.query(Work).filter_by(role="target").first()
     proj_id = work.project_id if work else "default"
     mgr = ArcManager()
@@ -454,7 +477,7 @@ def get_arc_commitments(arc_id: str, current_scene: int = Query(1, ge=1), db: Se
     return mgr.track_commitments(plan, current_scene)
 
 @app.post("/api/editor/review", response_model=EditorialReview)
-def review_chapter(req: EditorialReviewRequest):
+def review_chapter(req: EditorialReviewRequest, _rl: bool = Depends(rate_limit_heavy)):
     mgr = ArcManager()
     from story_forecaster.writing.voice import VoiceRegistry
     reg = VoiceRegistry()
@@ -482,7 +505,7 @@ def list_tasks(db: Session = Depends(get_db)):
     } for t in tasks]
 
 @app.post("/api/tasks")
-def enqueue_task(req: EnqueueTaskRequest, db: Session = Depends(get_db)):
+def enqueue_task(req: EnqueueTaskRequest, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     queue = TaskQueue()
     task = queue.enqueue(
         session=db,
@@ -493,7 +516,7 @@ def enqueue_task(req: EnqueueTaskRequest, db: Session = Depends(get_db)):
     return {"task_id": task.id, "status": task.status, "progress_pct": task.progress_pct}
 
 @app.post("/api/tasks/{task_id}/run")
-def run_task_worker(task_id: str, max_cost_limit: float = Query(0.50, ge=0.01), db: Session = Depends(get_db)):
+def run_task_worker(task_id: str, max_cost_limit: float = Query(0.50, ge=0.01), db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key), _rl: bool = Depends(rate_limit_heavy)):
     queue = TaskQueue()
     try:
         task = queue.execute_worker_cycle(db, task_id, max_cost_limit_usd=max_cost_limit)
@@ -509,7 +532,7 @@ def run_task_worker(task_id: str, max_cost_limit: float = Query(0.50, ge=0.01), 
     }
 
 @app.post("/api/tasks/{task_id}/cancel")
-def cancel_task(task_id: str, db: Session = Depends(get_db)):
+def cancel_task(task_id: str, db: Session = Depends(get_db), _auth: bool = Depends(verify_api_key)):
     queue = TaskQueue()
     try:
         task = queue.cancel_task(db, task_id)
