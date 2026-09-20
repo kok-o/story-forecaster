@@ -24,6 +24,7 @@ class PlotBeat(BaseModel):
     participants: List[str] = Field(default_factory=list, description="Characters involved")
     conflict_type: Optional[str] = None
     epistemic_change: Optional[str] = Field(None, description="What information or belief changes as a result")
+    source_citations: List[str] = Field(default_factory=list, description="IDs of sources cited in this beat (e.g. ['scene_191'])")
 
 class PredictionCandidate(BaseModel):
     """One distinct prospective chapter development trajectory."""
@@ -36,8 +37,9 @@ class PredictionCandidate(BaseModel):
     confidence_label: str = Field("UNVERIFIED", description="High / Moderate / Low / Experimental")
     rationale: str = Field(..., description="Justification grounded in story context and author habits")
     assumptions: List[str] = Field(default_factory=list, description="Explicit assumptions required for this path")
+    source_citations: List[str] = Field(default_factory=list, description="All source IDs cited by this candidate")
     continuity_verified: bool = Field(False, description="Passed hard constraint checker")
-    continuity_status: str = Field("not_checked", description="passed / failed / not_checked")
+    continuity_status: str = Field("not_checked", description="passed / failed / not_checked / citation_violation")
     verification_notes: Optional[str] = Field(None, description="Detailed continuity verification status and notes")
 
 class ForecastResult(BaseModel):
@@ -46,6 +48,9 @@ class ForecastResult(BaseModel):
     cutoff_chapter: int
     candidates: List[PredictionCandidate] = Field(..., min_length=1, max_length=5)
     author_precedent_citations: List[str] = Field(default_factory=list)
+    included_sources: List[Dict[str, Any]] = Field(default_factory=list, description="List of source items included in the prompt with their IDs and metadata")
+    context_truncation_info: Dict[str, Any] = Field(default_factory=dict, description="Metadata about context budget, character counts, and truncation")
+    raw_usage: Dict[str, Any] = Field(default_factory=dict, description="Token usage and metadata from provider")
     generated_at_utc: str
     scope_manifest_hash: str
     provider: str = Field("demo", description="Provider used for generation (e.g. 'demo', 'gemini-3.8-flash')")

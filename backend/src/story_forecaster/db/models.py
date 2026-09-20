@@ -107,7 +107,13 @@ class Run(Base):
     project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
     run_type = Column(String(50), nullable=False)  # forecast, backtest, demo
     config_json = Column(JSON, default=dict)
-    status = Column(String(50), default="COMPLETED")
+    status = Column(String(50), default="COMPLETED")  # QUEUED, RUNNING, COMPLETED, FAILED
+    model_name = Column(String(100), nullable=True)
+    prompt_version = Column(String(50), nullable=True, default="v2.0")
+    request_payload_json = Column(JSON, default=dict)
+    response_raw_text = Column(Text, nullable=True)
+    usage_json = Column(JSON, default=dict)
+    error_message = Column(Text, nullable=True)
     context_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
@@ -121,6 +127,8 @@ class Candidate(Base):
     topology_json = Column(JSON, nullable=False)
     events_json = Column(JSON, nullable=False)
     scores_json = Column(JSON, default=dict)
+    citations_json = Column(JSON, default=list)
+    raw_candidate_json = Column(JSON, default=dict)
     status = Column(String(50), default="ACTIVE")
     created_at = Column(DateTime, default=utc_now)
 

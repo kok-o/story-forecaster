@@ -8,18 +8,22 @@ from ..memory.engine import NarrativeMemoryEngine
 from ..canon.registry import CanonDivergenceRegistry
 from ..author.precedents import AuthorPrecedentLibrary
 from ..retrieval.engine import HybridRetrievalEngine
-from ..providers.base import BaseLLMProvider
+from ..providers.base import BaseLLMProvider, ProviderUnavailableError
 from ..db.session import SessionLocal
 from ..db.models import Run, Candidate, Scene, Chapter
+from .context_builder import NarrativeContextBuilder
+from .citation_verifier import CitationVerifier
 
 logger = logging.getLogger(__name__)
 
 class ForecastEngine:
     """
-    Two-stage narrative forecasting engine:
-    1. Macro-Topology & POV Selection
-    2. Micro-Beat Synthesis constrained by Theory of Mind & Canon divergence
-    3. Consistency Evaluation & Ranking
+    Narrative forecasting engine for Author N.B.
+    M2 Implementation:
+    1. Volume-bounded context builder with exact scene sources and truncation metadata.
+    2. Citation verifier preventing hallucinated or future-leakage scene citations.
+    3. Strict Run lifecycle (RUNNING -> COMPLETED / FAILED) with usage metrics and complete candidate storage.
+    4. Explicit error propagation (no silent conversion of missing API to demo).
     """
 
     def __init__(
@@ -28,42 +32,22 @@ class ForecastEngine:
         canon_registry: Optional[CanonDivergenceRegistry] = None,
         author_lib: Optional[AuthorPrecedentLibrary] = None,
         retrieval_engine: Optional[HybridRetrievalEngine] = None,
-        provider: Optional[BaseLLMProvider] = None
+        provider: Optional[BaseLLMProvider] = None,
+        context_builder: Optional[NarrativeContextBuilder] = None,
+        citation_verifier: Optional[CitationVerifier] = None
     ):
         self.memory_engine = memory_engine or NarrativeMemoryEngine()
         self.canon_registry = canon_registry or CanonDivergenceRegistry()
         self.author_lib = author_lib or AuthorPrecedentLibrary()
         self.retrieval_engine = retrieval_engine or HybridRetrievalEngine()
+        self.context_builder = context_builder or NarrativeContextBuilder()
+        self.citation_verifier = citation_verifier or CitationVerifier()
+
         if provider is None:
             from ..providers import get_provider
             self.provider = get_provider(prefer_gemini=False)
         else:
             self.provider = provider
-
-    def _fetch_recent_scenes(self, scope: ForecastScope, limit: int = 4) -> List[Dict[str, Any]]:
-        """Fetches immediate narrative scenes preceding the cutoff sequence."""
-        db = SessionLocal()
-        try:
-            scenes = (
-                db.query(Scene, Chapter)
-                .join(Chapter, Scene.chapter_id == Chapter.id)
-                .filter(Chapter.work_version_id == scope.target_work_version_id)
-                .filter(Scene.discourse_seq <= scope.target_max_discourse_seq)
-                .order_by(Scene.discourse_seq.desc())
-                .limit(limit)
-                .all()
-            )
-            out = []
-            for sc, ch in reversed(scenes):
-                out.append({
-                    "chapter_ordinal": ch.ordinal,
-                    "discourse_seq": sc.discourse_seq,
-                    "summary": sc.summary or "",
-                    "snippet": (sc.content[:300] + "...") if sc.content else ""
-                })
-            return out
-        finally:
-            db.close()
 
     def _retrieve_thematic_excerpts(self, scope: ForecastScope, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Retrieves past scenes relevant to active plot threads within scope boundary."""
@@ -117,7 +101,7 @@ class ForecastEngine:
             cand.continuity_verified = False
             cand.continuity_status = "failed"
             cand.verification_notes = "Continuity violations: " + "; ".join(violations)
-        else:
+        elif cand.continuity_status != "citation_violation":
             cand.continuity_verified = True
             cand.continuity_status = "passed"
             cand.verification_notes = f"Verified: All characters and epistemic states valid at seq <= {scope.target_max_discourse_seq}."
@@ -134,80 +118,120 @@ class ForecastEngine:
     ) -> ForecastResult:
         """
         Executes a leak-free prospective forecast run constrained by scope.
-        Supports ablation toggles for empirical component evaluation.
+        Guarantees:
+        1. Context is volume-bounded with verifiable source IDs.
+        2. Citations from candidates are rigorously validated against provided sources.
+        3. Runs are audited in DB with status (RUNNING -> COMPLETED / FAILED).
+        4. Complete candidate representations are stored without loss.
         """
-        # 1. Reconstruct point-in-time narrative state snapshot
-        snapshot = self.memory_engine.get_snapshot(scope)
+        db: Session = SessionLocal()
+        db_run = None
 
-        # 2. Extract active canon alignments (5-state defeasible model)
-        canon_overlays = [] if disable_canon else self.canon_registry.get_overlays(scope)
+        try:
+            # 1. Assemble volume-bounded narrative context
+            context_result = self.context_builder.build_context(db=db, scope=scope)
 
-        # 3. Retrieve relevant authorial precedents
-        if disable_author:
-            precedents = []
-        else:
-            active_tags = ["fairy_blackmail", "trade", "subordinates", "dungeon_surge", "interlude"]
-            precedents = self.author_lib.query_precedents(scope, active_tags)
+            # 2. Point-in-time narrative state snapshot
+            snapshot = self.memory_engine.get_snapshot(scope)
 
-        # 4. Assemble recent scenes and retrieved historical excerpts
-        recent_scenes = self._fetch_recent_scenes(scope, limit=4)
-        if disable_retrieval:
-            retrieved_excerpts = []
-        else:
-            thread_keywords = " ".join([t.thread_id.replace("_", " ") for t in snapshot.active_threads])
-            retrieved_excerpts = self._retrieve_thematic_excerpts(scope, query=thread_keywords or "сюжет", top_k=3)
+            # 3. Active canon alignments
+            canon_overlays = [] if disable_canon else self.canon_registry.get_overlays(scope)
 
-        target_context = {
-            "chapter_num": snapshot.chapter_num,
-            "discourse_seq": snapshot.through_discourse_seq,
-            "active_threads": [] if disable_memory else [t.model_dump() for t in snapshot.active_threads],
-            "epistemic_states": [] if disable_memory else [e.model_dump() for e in snapshot.epistemic_states],
-            "characters": snapshot.active_characters,
-            "world_conditions": {} if disable_memory else snapshot.world_conditions,
-            "recent_scenes": recent_scenes,
-            "retrieved_excerpts": retrieved_excerpts
-        }
-
-        # 5. Execute Generation via Provider
-        result = self.provider.generate_hypotheses(
-            scope=scope,
-            target_context=target_context,
-            author_precedents=[p.model_dump() for p in precedents],
-            canon_context=[c.model_dump() for c in canon_overlays],
-            num_candidates=num_candidates
-        )
-
-        # 6. Consistency Verification & Filter
-        for cand in result.candidates:
-            if getattr(result, "is_synthetic_demonstration", False) or cand.verification_notes and "Синтетический шаблон" in cand.verification_notes:
-                cand.continuity_verified = False
-                cand.continuity_status = "not_checked"
+            # 4. Authorial decision precedents
+            if disable_author:
+                precedents = []
             else:
-                self._verify_candidate_continuity(
-                    cand=cand,
-                    scope=scope,
-                    active_characters=snapshot.active_characters,
-                    epistemic_states=snapshot.epistemic_states
-                )
+                active_tags = ["fairy_blackmail", "trade", "subordinates", "dungeon_surge", "interlude"]
+                precedents = self.author_lib.query_precedents(scope, active_tags)
 
-        # 7. Persist to DB if requested
-        if persist_run:
-            db: Session = SessionLocal()
-            try:
+            # 5. Retrieved historical excerpts
+            if disable_retrieval:
+                retrieved_excerpts = []
+            else:
+                thread_keywords = " ".join([t.thread_id.replace("_", " ") for t in snapshot.active_threads])
+                retrieved_excerpts = self._retrieve_thematic_excerpts(scope, query=thread_keywords or "сюжет", top_k=3)
+
+            # Target context payload with segregated sources and truncation metadata
+            target_context = {
+                "chapter_num": snapshot.chapter_num,
+                "discourse_seq": snapshot.through_discourse_seq,
+                "active_threads": [] if disable_memory else [t.model_dump() for t in snapshot.active_threads],
+                "epistemic_states": [] if disable_memory else [e.model_dump() for e in snapshot.epistemic_states],
+                "characters": snapshot.active_characters,
+                "world_conditions": {} if disable_memory else snapshot.world_conditions,
+                "recent_scenes": [s.model_dump() for s in context_result.sources],
+                "formatted_source_text": context_result.formatted_source_text,
+                "included_sources": [s.model_dump() for s in context_result.sources],
+                "truncation_info": context_result.truncation_info,
+                "retrieved_excerpts": retrieved_excerpts
+            }
+
+            # 6. Initialize Run in DB with status RUNNING
+            if persist_run:
                 db_run = Run(
                     project_id=scope.project_id,
                     run_type="forecast",
                     config_json={
                         "scope": scope.model_dump(),
-                        "provider": getattr(result, "provider", "unknown"),
-                        "is_synthetic_demonstration": getattr(result, "is_synthetic_demonstration", False),
-                        "num_candidates": num_candidates
+                        "num_candidates": num_candidates,
+                        "truncation_info": context_result.truncation_info
                     },
-                    status="COMPLETED",
-                    context_hash=result.scope_manifest_hash
+                    status="RUNNING",
+                    model_name=getattr(self.provider, "model_name", getattr(self.provider, "provider_name", "unknown")),
+                    prompt_version="v2.0-m2",
+                    request_payload_json={
+                        "scope_manifest_hash": scope.manifest_hash(),
+                        "included_sources_count": len(context_result.sources),
+                        "used_chars": context_result.truncation_info.get("used_chars", 0)
+                    },
+                    context_hash=scope.manifest_hash()
                 )
                 db.add(db_run)
-                db.flush()
+                db.commit()
+
+            # 7. Execute Generation via Provider
+            result = self.provider.generate_hypotheses(
+                scope=scope,
+                target_context=target_context,
+                author_precedents=[p.model_dump() for p in precedents],
+                canon_context=[c.model_dump() for c in canon_overlays],
+                num_candidates=num_candidates
+            )
+
+            # Attach provenance and truncation info to result
+            result.included_sources = [s.model_dump() for s in context_result.sources]
+            result.context_truncation_info = context_result.truncation_info
+
+            # 8. Verify Citations against provided source IDs
+            valid_source_ids = set(context_result.source_ids)
+            self.citation_verifier.verify_citations(
+                candidates=result.candidates,
+                valid_source_ids=valid_source_ids,
+                scope=scope
+            )
+
+            # 9. Verify Narrative Continuity
+            for cand in result.candidates:
+                if getattr(result, "is_synthetic_demonstration", False) or (cand.verification_notes and "Синтетический шаблон" in cand.verification_notes):
+                    cand.continuity_verified = False
+                    cand.continuity_status = "not_checked"
+                else:
+                    self._verify_candidate_continuity(
+                        cand=cand,
+                        scope=scope,
+                        active_characters=snapshot.active_characters,
+                        epistemic_states=snapshot.epistemic_states
+                    )
+
+            # 10. Persist Completed Run and Full Candidate Objects to DB
+            if persist_run and db_run:
+                db_run.status = "COMPLETED"
+                db_run.usage_json = getattr(result, "raw_usage", {})
+                db_run.config_json = {
+                    **db_run.config_json,
+                    "provider": getattr(result, "provider", "unknown"),
+                    "is_synthetic_demonstration": getattr(result, "is_synthetic_demonstration", False)
+                }
 
                 for c in result.candidates:
                     db_cand = Candidate(
@@ -221,15 +245,24 @@ class ForecastEngine:
                             "continuity_verified": c.continuity_verified,
                             "verification_notes": c.verification_notes
                         },
+                        citations_json=c.source_citations,
+                        raw_candidate_json=c.model_dump(),
                         status="ACTIVE"
                     )
                     db.add(db_cand)
 
                 db.commit()
-            except Exception as e:
-                db.rollback()
-                logger.error(f"Failed to persist forecast run to DB: {e}")
-            finally:
-                db.close()
 
-        return result
+            return result
+
+        except Exception as e:
+            if persist_run and db_run:
+                try:
+                    db_run.status = "FAILED"
+                    db_run.error_message = str(e)
+                    db.commit()
+                except Exception as db_err:
+                    logger.error(f"Failed to record failed Run status: {db_err}")
+            raise e
+        finally:
+            db.close()
