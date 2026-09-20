@@ -7,7 +7,9 @@ from .models import (
     Scene,
     Artifact,
     Run,
-    Candidate
+    Candidate,
+    Branch,
+    BranchScene
 )
 
 def migrate_columns():
@@ -67,5 +69,7 @@ __all__ = [
     "Scene",
     "Artifact",
     "Run",
-    "Candidate"
+    "Candidate",
+    "Branch",
+    "BranchScene"
 ]

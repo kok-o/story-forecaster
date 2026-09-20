@@ -133,3 +133,45 @@ class Candidate(Base):
     created_at = Column(DateTime, default=utc_now)
 
     run = relationship("Run", back_populates="candidates")
+
+class Branch(Base):
+    """
+    Isolated fanfic divergence branch branching off from an exact version and discourse sequence cutoff.
+    Guarantees the original book is never modified.
+    """
+    __tablename__ = "branches"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    parent_work_version_id = Column(String(36), ForeignKey("work_versions.id"), nullable=False)
+    cutoff_discourse_seq = Column(Integer, nullable=False)
+    branch_name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(50), default="ACTIVE")  # ACTIVE, ARCHIVED, MERGED
+    created_at = Column(DateTime, default=utc_now)
+
+    scenes = relationship("BranchScene", back_populates="branch", order_by="BranchScene.scene_ordinal")
+
+class BranchScene(Base):
+    """
+    Individual scene within a fanfic branch.
+    Stores ScenePlan, generated prose, status (DRAFT, ACCEPTED, REJECTED, SUPERSEDED), and state delta.
+    """
+    __tablename__ = "branch_scenes"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "scene_ordinal", "revision_num", name="uq_branch_scene_revision"),
+    )
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    branch_id = Column(String(36), ForeignKey("branches.id"), nullable=False)
+    scene_ordinal = Column(Integer, nullable=False)
+    revision_num = Column(Integer, default=1, nullable=False)
+    title = Column(String(255), nullable=False)
+    scene_plan_json = Column(JSON, nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(String(50), default="ACCEPTED")  # DRAFT, ACCEPTED, REJECTED, SUPERSEDED
+    state_delta_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=utc_now)
+
+    branch = relationship("Branch", back_populates="scenes")
+

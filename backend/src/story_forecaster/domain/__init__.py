@@ -24,6 +24,13 @@ from .memory import (
     NarrativeSnapshot
 )
 
+from .writing import (
+    ScenePlan,
+    CharacterVoiceProfile,
+    ProposedStateDelta,
+    SceneValidationResult
+)
+
 __all__ = [
     "ForecastScope",
     "ReferenceClassification",
@@ -43,5 +50,10 @@ __all__ = [
     "PlotThreadKind",
     "PlotThreadStatus",
     "PlotThread",
-    "NarrativeSnapshot"
+    "NarrativeSnapshot",
+    "ScenePlan",
+    "CharacterVoiceProfile",
+    "ProposedStateDelta",
+    "SceneValidationResult"
 ]
+

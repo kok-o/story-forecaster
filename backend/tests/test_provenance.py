@@ -127,12 +127,12 @@ def test_resolve_scope_multi_version(mem_db):
     proj = Project(title="P1")
     work = Work(title="Book", author_name="Author", role="target", project=proj)
     mem_db.add_all([proj, work])
-    mem_db.flush()
-
-    v1 = WorkVersion(work=work, original_sha256="h1", normalized_sha256="h1")
-    v2 = WorkVersion(work=work, original_sha256="h2", normalized_sha256="h2")
+    from datetime import datetime, timezone
+    v1 = WorkVersion(work=work, original_sha256="h1", normalized_sha256="h1", created_at=datetime(2024, 1, 1, tzinfo=timezone.utc))
+    v2 = WorkVersion(work=work, original_sha256="h2", normalized_sha256="h2", created_at=datetime(2024, 1, 2, tzinfo=timezone.utc))
     mem_db.add_all([v1, v2])
     mem_db.flush()
+
 
     c1_v1 = Chapter(work_version_id=v1.id, ordinal=1, title="Ch1 V1", char_count=100)
     c1_v2 = Chapter(work_version_id=v2.id, ordinal=1, title="Ch1 V2", char_count=200)
