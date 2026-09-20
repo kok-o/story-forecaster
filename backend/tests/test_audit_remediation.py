@@ -443,3 +443,77 @@ def test_api_rate_limiter_p2_16():
     assert "Retry-After" in exc_info.value.headers
 
 
+def test_ablation_honesty_demo_provider_p1_08():
+    """P1-08: AblationBenchmark with DemoProvider remains is_synthetic_demonstration=True even with execute_live=True."""
+    from story_forecaster.evaluation.ablation import AblationBenchmark
+    from story_forecaster.forecast.engine import ForecastEngine
+    from story_forecaster.providers import DemoProvider
+
+    engine = ForecastEngine(provider=DemoProvider())
+    bench = AblationBenchmark(engine=engine)
+    report = bench.run_benchmark(execute_live=True, include_fine_grained=False)
+
+    # Must be honestly identified as synthetic demonstration because DemoProvider was used
+    assert report.is_synthetic_demonstration is True
+    assert "[СИНТЕТИЧЕСКИЙ ДЕМО-ПРОГОН" in report.summary_analysis
+    assert len(report.runs) >= 4
+
+    for r in report.runs:
+        # Separate Best@1 and Oracle@K tracked
+        assert hasattr(r, "best_at_1_f1")
+        assert hasattr(r, "oracle_at_k_f1")
+        assert "disable_retrieval" in r.disable_flags
+        assert "disable_memory" in r.disable_flags
+
+
+def test_editorial_review_honesty_on_trivial_input_p2_09():
+    """P2-09: Trivial scenes ('abc', 'abc') must not receive inflated quality scores or false publication clearance."""
+    from story_forecaster.planning.arc_manager import ArcManager
+
+    mgr = ArcManager()
+    review = mgr.editorial_review_chapter(chapter_ordinal=1, scenes_content=["abc", "abc"])
+
+    # Scorecard must not be inflated
+    assert review.scorecard.overall_quality_score < 0.60
+    assert review.scorecard.pacing_score <= 0.35
+    assert "Тривиально малый объём" in review.pacing_assessment
+
+    # Must NOT contain false publication readiness recommendation
+    assert "Глава стилистически и композиционно готова к публикации в ветке." not in review.recommendations
+    assert any("требуют экспертной вычитки редактором" in rec for rec in review.recommendations)
+
+
+def test_task_queue_rejects_unsupported_handler_p2_10(clean_db, synthetic_project):
+    """P2-10: Task with unsupported task_type fails immediately instead of simulating completion."""
+    from story_forecaster.tasks.queue import TaskQueue
+
+    queue = TaskQueue()
+    task = queue.enqueue(session=clean_db, task_type="INVALID_NO_HANDLER", params={})
+    assert task.status == "QUEUED"
+
+    result = queue.execute_worker_cycle(clean_db, task.id)
+    assert result.status == "FAILED"
+    assert "Unsupported task_type: 'INVALID_NO_HANDLER'" in result.error_message
+
+
+def test_context_builder_strict_budget_truncation_p2_11(clean_db, synthetic_project):
+    """P2-11: NarrativeContextBuilder enforces strict budget limit even on first scene."""
+    from story_forecaster.forecast.context_builder import NarrativeContextBuilder
+    from story_forecaster.domain.scope import ForecastScope
+
+    builder = NarrativeContextBuilder()
+    v1 = synthetic_project["v1"]
+    scope = ForecastScope(
+        project_id="p1",
+        target_work_version_id=v1.id,
+        target_max_discourse_seq=10
+    )
+
+    # Request with tiny budget of 10 chars
+    ctx = builder.build_context(db=clean_db, scope=scope, char_budget=10)
+    assert ctx.truncation_info["used_chars"] <= 10
+    for doc in ctx.sources:
+        assert doc.char_count <= 10
+
+
+

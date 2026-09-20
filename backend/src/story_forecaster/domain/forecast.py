@@ -55,3 +55,4 @@ class ForecastResult(BaseModel):
     scope_manifest_hash: str
     provider: str = Field("demo", description="Provider used for generation (e.g. 'demo', 'gemini-3.8-flash')")
     is_synthetic_demonstration: bool = Field(False, description="True if generated from pre-scripted demonstration templates")
+    run_id: Optional[str] = Field(None, description="Database ID of the persisted execution run")

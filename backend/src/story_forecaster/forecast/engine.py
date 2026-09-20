@@ -202,7 +202,14 @@ class ForecastEngine:
                     request_payload_json={
                         "scope_manifest_hash": scope.manifest_hash(),
                         "included_sources_count": len(context_result.sources),
-                        "used_chars": context_result.truncation_info.get("used_chars", 0)
+                        "used_chars": context_result.truncation_info.get("used_chars", 0),
+                        "num_candidates": num_candidates,
+                        "disable_flags": {
+                            "retrieval": disable_retrieval,
+                            "canon": disable_canon,
+                            "author": disable_author,
+                            "memory": disable_memory
+                        }
                     },
                     context_hash=scope.manifest_hash()
                 )
@@ -217,6 +224,9 @@ class ForecastEngine:
                 canon_context=[c.model_dump() for c in canon_overlays],
                 num_candidates=num_candidates
             )
+
+            if persist_run and db_run:
+                result.run_id = db_run.id
 
             # Attach provenance and truncation info to result
             result.included_sources = [s.model_dump() for s in context_result.sources]
@@ -247,6 +257,7 @@ class ForecastEngine:
             if persist_run and db_run:
                 db_run.status = "COMPLETED"
                 db_run.usage_json = getattr(result, "raw_usage", {})
+                db_run.response_raw_text = getattr(result, "raw_response_text", None) or f"Generated {len(result.candidates)} candidates via {getattr(result, 'provider', 'unknown')}"
                 db_run.config_json = {
                     **db_run.config_json,
                     "provider": getattr(result, "provider", "unknown"),

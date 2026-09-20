@@ -79,10 +79,27 @@ class NarrativeContextBuilder:
         included_scene_seqs: Set[int] = set()
 
         for sc, ch in all_scenes:
+            if used_chars >= budget or len(selected_pairs) >= limit_scenes:
+                break
+
             content = sc.content or ""
             content_len = len(content)
-            # Stop if budget would be exceeded and we already have at least 1 scene
-            if selected_pairs and (used_chars + content_len > budget or len(selected_pairs) >= limit_scenes):
+
+            if used_chars + content_len > budget:
+                remaining = budget - used_chars
+                if remaining <= 0:
+                    break
+                truncated_content = content[:remaining]
+                sc_proxy = type("SceneProxy", (), {
+                    "id": getattr(sc, "id", f"scene_{sc.discourse_seq}"),
+                    "ordinal": sc.ordinal,
+                    "discourse_seq": sc.discourse_seq,
+                    "summary": getattr(sc, "summary", None),
+                    "content": truncated_content
+                })()
+                selected_pairs.append((sc_proxy, ch))
+                included_scene_seqs.add(sc.discourse_seq)
+                used_chars += len(truncated_content)
                 break
 
             selected_pairs.append((sc, ch))

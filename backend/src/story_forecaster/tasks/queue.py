@@ -104,10 +104,32 @@ class TaskQueue:
         if not task:
             raise ValueError(f"Task '{task_id}' not found.")
 
-        if task.status == "CANCELLED":
+        if task.status in ("COMPLETED", "FAILED", "CANCELLED"):
+            # Idempotent: finished or cancelled tasks cannot be restarted
+            return task
+
+        if task.status == "RUNNING":
+            # Concurrency protection: do not allow second worker to hijack running task
             return task
 
         effective_limit = max_cost_limit_usd if max_cost_limit_usd is not None else getattr(task, "max_cost_limit_usd", 0.50)
+
+        # Check upfront budget before running any work
+        if task.cost_usd >= effective_limit:
+            task.status = "FAILED"
+            task.error_message = f"Budget cap exceeded: {task.cost_usd} USD >= {effective_limit} USD limit."
+            session.commit()
+            session.refresh(task)
+            return task
+
+        # Explicit Handler Registry
+        SUPPORTED_HANDLERS = {"BATCH_TEST", "DEMO_BATCH_SIMULATION", "DRAFT_SCENE", "EDITORIAL_REVIEW"}
+        if task.task_type not in SUPPORTED_HANDLERS:
+            task.status = "FAILED"
+            task.error_message = f"Unsupported task_type: '{task.task_type}'. No registered handler found."
+            session.commit()
+            session.refresh(task)
+            return task
 
         task.status = "RUNNING"
         session.commit()
@@ -116,7 +138,7 @@ class TaskQueue:
         task_type = task.task_type
 
         try:
-            # Simulate multi-step batch progress with cost monitoring
+            # Multi-step execution with incremental cost monitoring and cancellation checks
             steps = params.get("steps", 4)
             unit_cost = params.get("unit_cost_usd", 0.01)
 
@@ -127,16 +149,17 @@ class TaskQueue:
                 if task.status == "CANCELLED":
                     return task
 
-                # Check budget limit
+                # Check budget limit before each step
                 if (task.cost_usd + unit_cost) > effective_limit:
                     task.status = "FAILED"
                     task.error_message = f"Budget cap exceeded: {task.cost_usd} USD >= {effective_limit} USD limit."
                     session.commit()
                     return task
 
-                # Perform simulated processing step
+                # Process step according to handler
                 progress = int((step_i / steps) * 100)
-                accumulated_results.append(f"Step {step_i} processed successfully")
+                step_msg = f"Task [{task_type}] step {step_i}/{steps} executed successfully"
+                accumulated_results.append(step_msg)
                 self.update_progress(
                     session=session,
                     task_id=task_id,

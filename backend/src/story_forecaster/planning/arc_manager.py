@@ -180,18 +180,31 @@ class ArcManager:
         full_text = "\n\n".join(scenes_content).lower()
 
         # 1. Pacing analysis
-        scene_lengths = [len(s) for s in scenes_content]
-        avg_len = sum(scene_lengths) / len(scene_lengths)
-        variance = sum((l - avg_len) ** 2 for l in scene_lengths) / len(scene_lengths)
-        # Optimal pacing has healthy variation (not identical monotonous block lengths)
-        has_rhythm_variation = variance > 5000 or len(scene_lengths) >= 2
-        pacing_score = 0.90 if has_rhythm_variation else 0.70
-        pacing_assessment = (
-            f"Динамичный темп: {len(scenes_content)} сцен(ы) со средней длиной {int(avg_len)} зн. "
-            f"и выраженным композиционным чередованием."
-            if has_rhythm_variation else
-            f"Монотонная длина сцен (дисперсия {int(variance)}). Рекомендуется варьировать темп."
-        )
+        scene_lengths = [len(s.strip()) for s in scenes_content]
+        avg_len = sum(scene_lengths) / len(scene_lengths) if scene_lengths else 0
+        variance = sum((l - avg_len) ** 2 for l in scene_lengths) / len(scene_lengths) if scene_lengths else 0
+
+        # Guard against trivial or empty text
+        if avg_len < 100:
+            pacing_score = 0.30
+            pacing_assessment = (
+                f"Тривиально малый объём текста (средняя длина {int(avg_len)} зн.). "
+                f"Недостаточно данных для полноценного темпорального анализа ритма."
+            )
+        else:
+            has_rhythm_variation = variance > 5000 and len(scene_lengths) >= 2
+            if has_rhythm_variation:
+                pacing_score = 0.85
+                pacing_assessment = (
+                    f"Умеренный темп: {len(scenes_content)} сцен(ы) со средней длиной {int(avg_len)} зн. "
+                    f"и вариативностью объёмов (дисперсия {int(variance)})."
+                )
+            else:
+                pacing_score = 0.50
+                pacing_assessment = (
+                    f"Монотонная длина сцен (дисперсия {int(variance)}, средняя длина {int(avg_len)} зн.). "
+                    f"Рекомендуется варьировать темп между краткими и подробными сценами."
+                )
 
         # 2. Repetition detection (clichés & overused stock phrases)
         stock_phrases = [
@@ -213,31 +226,32 @@ class ArcManager:
 
         # 3. Character Voice Consistency
         voice_anomalies = []
-        voice_score = 0.90
-
+        found_characters = []
         if voice_profiles:
             for vp in voice_profiles:
                 char_name = vp.character_id
                 short_name = char_name.split()[-1].lower()
                 if short_name in full_text:
+                    found_characters.append(char_name)
                     # Check typical keywords or honorifics
                     if char_name == "Сато Кадзума":
                         has_honorific = any(w in full_text for w in ["босс", "шеф", "куб", "удача"])
                         if not has_honorific:
                             voice_anomalies.append(f"Кадзума теряет речевой маркер 'Босс'/'Шеф'.")
-                            voice_score -= 0.10
                     elif char_name == "Хачиман Хикигая":
                         has_cynicism = any(w in full_text for w in ["система", "контракт", "сделка", "взгляд", "сухо"])
                         if not has_cynicism:
                             voice_anomalies.append("Хачиман звучит слишком эмоционально, отсутствует прагматичный тон.")
-                            voice_score -= 0.10
 
-        voice_score = max(0.50, voice_score)
+        if not found_characters:
+            voice_score = 0.50  # Neutral baseline when character markers not observed
+        else:
+            voice_score = max(0.30, 0.80 - (len(voice_anomalies) * 0.15))
 
         # 4. Causal Coherence
         causal_markers = ["поэтому", "вследствие", "отныне", "теперь", "итог", "результат", "с этого момента"]
         causal_hits = sum(1 for m in causal_markers if m in full_text)
-        causal_coherence_score = min(1.0, 0.70 + (causal_hits * 0.05))
+        causal_coherence_score = min(0.90, 0.40 + (causal_hits * 0.10))
 
         # Overall Score
         overall = max(
@@ -261,8 +275,9 @@ class ArcManager:
             recommendations.append("Заменить штампы и повторяющиеся речевые обороты на синонимичные действия.")
         if voice_anomalies:
             recommendations.append("Восстановить характерные речевые маркеры персонажей согласно профилю голоса.")
-        if overall >= 0.80:
-            recommendations.append("Глава стилистически и композиционно готова к публикации в ветке.")
+        if avg_len < 100:
+            recommendations.append("Увеличить объём сцен главы: текущий объём недостаточен для художественного анализа.")
+        recommendations.append("Эвристическая оценка: показатели служат ориентиром и требуют экспертной вычитки редактором.")
 
         return EditorialReview(
             chapter_ordinal=chapter_ordinal,

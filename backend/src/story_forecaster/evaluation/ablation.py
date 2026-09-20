@@ -10,6 +10,8 @@ class AblationRunResult(BaseModel):
     config_name: str
     description: str
     best_f1: float
+    best_at_1_f1: float = 0.0
+    oracle_at_k_f1: float = 0.0
     mean_f1: float = 0.0
     f1_variance: float = 0.0
     event_recall: float
@@ -17,6 +19,8 @@ class AblationRunResult(BaseModel):
     topology_score: Optional[float] = None
     missed_events_count: int = 0
     spurious_beats_count: int = 0
+    run_id: Optional[str] = None
+    disable_flags: Dict[str, bool] = Field(default_factory=dict)
 
 class AblationBenchmarkReport(BaseModel):
     """Aggregate benchmark report across ablation configurations."""
@@ -168,37 +172,50 @@ class AblationBenchmark:
                 is_synthetic_demonstration=True
             )
 
+        provider_cls = self.engine.provider.__class__.__name__.lower()
+        provider_name = getattr(self.engine.provider, "name", getattr(self.engine.provider, "provider_name", provider_cls)).lower()
+        is_provider_synthetic = "demo" in provider_name or "demo" in provider_cls or getattr(self.engine.provider, "is_mock", False)
+        is_synthetic = (not execute_live) or is_provider_synthetic
+
         # Live ablation execution: run actual forecast under each configuration
         runs = []
         for name, desc, kwargs in configs_meta:
             result = self.engine.run_forecast(
                 scope=scope,
                 num_candidates=3,
-                persist_run=False,
+                persist_run=True,
                 **kwargs
             )
             report = self.evaluator.evaluate_forecast(result, gold_chapter, cutoff_chapter=cutoff_chapter)
+            best_at_1 = report.mean_f1
+            if hasattr(report, "best_candidate") and report.best_candidate:
+                best_at_1 = report.best_candidate.event_f1
+
             runs.append(AblationRunResult(
                 config_name=name,
                 description=desc,
                 best_f1=report.oracle_at_k.event_f1,
+                best_at_1_f1=round(best_at_1, 4),
+                oracle_at_k_f1=round(report.oracle_at_k.event_f1, 4),
                 mean_f1=report.mean_f1,
                 f1_variance=report.f1_variance,
                 event_recall=report.oracle_at_k.event_recall,
                 event_precision=report.oracle_at_k.event_precision,
                 topology_score=report.oracle_at_k.topology_score,
                 missed_events_count=len(report.oracle_at_k.missed_gold_events),
-                spurious_beats_count=len(report.oracle_at_k.spurious_predicted_beats)
+                spurious_beats_count=len(report.oracle_at_k.spurious_predicted_beats),
+                run_id=getattr(result, "run_id", None),
+                disable_flags=kwargs
             ))
 
         analysis = (
-            f"[ЭКСПЕРИМЕНТАЛЬНЫЙ ЗАПУСК: эмпирически измеренные показатели для Главы {gold_chapter.chapter_ordinal}]\n"
-            + "\n".join([f"- {r.config_name}: F1={r.best_f1}, Recall={r.event_recall}, Missed={r.missed_events_count}" for r in runs])
+            f"[{'СИНТЕТИЧЕСКИЙ ДЕМО-ПРОГОН' if is_synthetic else 'ЭМПИРИЧЕСКИЙ ЗАПУСК'}: показатели для Главы {gold_chapter.chapter_ordinal}]\n"
+            + "\n".join([f"- {r.config_name}: Best@1={r.best_at_1_f1}, Oracle@K={r.oracle_at_k_f1}, Recall={r.event_recall}, Missed={r.missed_events_count}" for r in runs])
         )
 
         return AblationBenchmarkReport(
             test_chapter=gold_chapter.chapter_ordinal,
             runs=runs,
             summary_analysis=analysis,
-            is_synthetic_demonstration=False
+            is_synthetic_demonstration=is_synthetic
         )
