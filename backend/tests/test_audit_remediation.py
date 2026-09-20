@@ -238,3 +238,106 @@ def test_task_queue_budget_preservation_p2_17(clean_db, synthetic_project):
     result = queue.execute_worker_cycle(clean_db, task.id)
     assert result.status == "FAILED"
     assert "Budget cap exceeded" in result.error_message
+
+
+def test_evidence_record_exact_coordinates_length_p1_04():
+    """P1-04: Baseline EvidenceRecords must have exact coordinates where (end_char - start_char) == len(source_text)."""
+    import hashlib
+    from story_forecaster.memory.engine import NarrativeMemoryEngine
+
+    engine = NarrativeMemoryEngine()
+    records = engine.get_evidence()
+    assert len(records) >= 8
+
+    for ev in records:
+        assert (ev.end_char - ev.start_char) == len(ev.source_text), f"Coordinate mismatch for {ev.evidence_id}"
+        expected_sha = hashlib.sha256(ev.source_text.encode("utf-8")).hexdigest()
+        assert ev.fragment_sha256 == expected_sha, f"Hash mismatch for {ev.evidence_id}"
+
+
+def test_reducer_isolates_by_work_version_id_p1_04(clean_db, synthetic_project):
+    """P1-04: EvidenceReducer isolates chapter resolution and excludes records from foreign versions."""
+    from story_forecaster.memory.reducer import EvidenceReducer
+    from story_forecaster.domain.memory import EvidenceRecord, EvidenceKind
+
+    v1 = synthetic_project["v1"]
+    v2 = synthetic_project["v2"]
+
+    ev_v1 = EvidenceRecord(
+        evidence_id="ev_v1_scoped",
+        kind=EvidenceKind.OBSERVED_EVENT,
+        reader_availability_seq=10,
+        chapter_ordinal=1,
+        scene_discourse_seq=10,
+        start_char=0,
+        end_char=10,
+        fragment_sha256="dummy",
+        source_text="Test v1 txt",
+        subject="Subject",
+        predicate="action",
+        work_version_id=v1.id
+    )
+
+    ev_v2 = EvidenceRecord(
+        evidence_id="ev_v2_alien",
+        kind=EvidenceKind.OBSERVED_EVENT,
+        reader_availability_seq=10,
+        chapter_ordinal=1,
+        scene_discourse_seq=10,
+        start_char=0,
+        end_char=10,
+        fragment_sha256="dummy",
+        source_text="Test v2 txt",
+        subject="Subject",
+        predicate="alien_action",
+        work_version_id=v2.id
+    )
+
+    snapshot_v1 = EvidenceReducer.reduce(
+        cutoff_seq=20,
+        evidence_records=[ev_v1, ev_v2],
+        threads=[],
+        epistemic_states=[],
+        db_session=clean_db,
+        work_version_id=v1.id
+    )
+
+    # Alien record ev_v2 must be excluded when reducing for v1
+    evidence_ids = [e.evidence_id for e in snapshot_v1.evidence_records]
+    assert "ev_v1_scoped" in evidence_ids
+    assert "ev_v2_alien" not in evidence_ids
+
+
+def test_author_precedents_scope_isolation_p1_07():
+    """P1-07: AuthorPrecedentLibrary tracks provenance status and honors scope ablation."""
+    from story_forecaster.author.precedents import AuthorPrecedentLibrary
+    from story_forecaster.domain.scope import ForecastScope
+
+    lib = AuthorPrecedentLibrary()
+    profile = lib.get_profile()
+
+    # Baseline transitions must be explicitly marked as curated heuristic rules
+    assert len(profile.transitions) >= 4
+    for t in profile.transitions:
+        assert t.is_corpus_verified is False
+        assert t.provenance_status == "curated_heuristic_rule"
+
+    # Ablated scope disallowing author manifest must return empty precedents list
+    ablated_scope = ForecastScope(
+        project_id="test_proj",
+        target_work_version_id="ver_1",
+        target_max_discourse_seq=182,
+        allowed_author_manifest_id="none"
+    )
+    res = lib.query_precedents(ablated_scope, tags=["fairy_blackmail"])
+    assert len(res) == 0
+
+    # Normal scope returns matching precedents
+    normal_scope = ForecastScope(
+        project_id="test_proj",
+        target_work_version_id="ver_1",
+        target_max_discourse_seq=182
+    )
+    res_normal = lib.query_precedents(normal_scope, tags=["fairy_blackmail"])
+    assert len(res_normal) >= 1
+

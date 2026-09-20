@@ -35,6 +35,9 @@ class AuthorTransition(BaseModel):
     consequence: str
     alternative_resolutions: List[str] = Field(default_factory=list, description="Alternative paths considered in corpus")
     applicability_tags: List[str]
+    is_corpus_verified: bool = Field(False, description="True only if text snippet is verified against physical source span")
+    source_work_version_id: Optional[str] = Field(None, description="Bound WorkVersion ID if resolved from DB")
+    provenance_status: str = Field("curated_heuristic_rule", description="'verified_corpus_span' or 'curated_heuristic_rule'")
 
 class AuthorTropeProfile(BaseModel):
     """Narrative fingerprint of author N.B. derived from his bibliography."""
@@ -97,7 +100,9 @@ class AuthorPrecedentLibrary:
                     AuthorTag.TRADE.value,
                     AuthorTag.EXTORTION.value,
                     AuthorTag.SUBORDINATES.value
-                ]
+                ],
+                is_corpus_verified=False,
+                provenance_status="curated_heuristic_rule"
             ),
             AuthorTransition(
                 transition_id="trans_subordinate_blunder_escalation",
@@ -117,7 +122,9 @@ class AuthorPrecedentLibrary:
                     AuthorTag.COMEDY.value,
                     AuthorTag.BLACKMAIL.value,
                     AuthorTag.SUBORDINATES.value
-                ]
+                ],
+                is_corpus_verified=False,
+                provenance_status="curated_heuristic_rule"
             ),
             AuthorTransition(
                 transition_id="trans_canon_derailment_preparation",
@@ -136,7 +143,9 @@ class AuthorPrecedentLibrary:
                     AuthorTag.DUNGEON_SURGE.value,
                     AuthorTag.HOTD_APOCALYPSE.value,
                     AuthorTag.CANON_DERAILMENT.value
-                ]
+                ],
+                is_corpus_verified=False,
+                provenance_status="curated_heuristic_rule"
             ),
             AuthorTransition(
                 transition_id="trans_interlude_native_shock",
@@ -155,17 +164,24 @@ class AuthorPrecedentLibrary:
                     AuthorTag.INTERLUDE.value,
                     AuthorTag.FUJIMI_ACADEMY.value,
                     AuthorTag.SAEKO_POV.value
-                ]
+                ],
+                is_corpus_verified=False,
+                provenance_status="curated_heuristic_rule"
             )
         ]
 
-    def query_precedents(self, scope: ForecastScope, tags: List[str]) -> List[AuthorTransition]:
+    def query_precedents(self, scope: Optional[ForecastScope], tags: List[str]) -> List[AuthorTransition]:
         """
-        Retrieves relevant author transitions matching tags via exact set matching.
+        Retrieves relevant author transitions matching tags via exact set matching under scope boundaries.
         Guarantees:
-        1. No substring collisions (e.g. 'trade' matching 'trade_fair' by mistake).
-        2. Strict deduplication of returned transitions.
+        1. Strict scope compliance: If scope is provided and scope.allowed_author_manifest_id is 'none' or 'DISALLOWED',
+           author precedents are strictly suppressed (zero-leakage / ablation isolation).
+        2. No substring collisions (e.g. 'trade' matching 'trade_fair' by mistake).
+        3. Strict deduplication of returned transitions.
         """
+        if scope is not None and scope.allowed_author_manifest_id in ("none", "DISALLOWED"):
+            return []
+
         tag_set: Set[str] = set(tags)
         matched: List[AuthorTransition] = []
         seen_ids: Set[str] = set()
@@ -185,6 +201,7 @@ class AuthorPrecedentLibrary:
                     seen_ids.add(t.transition_id)
 
         return matched
+
 
     def get_profile(self) -> AuthorTropeProfile:
         profile = AuthorTropeProfile()

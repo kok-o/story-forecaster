@@ -87,6 +87,8 @@ class EvidenceRecord(BaseModel):
     polarity: bool = True
     confidence: float = 1.0
     is_confirmed_world_fact: bool = False
+    work_version_id: Optional[str] = Field(None, description="Bound WorkVersion ID if grounded in database")
+
 
 class EvidenceConflict(BaseModel):
     """Preserves unresolved contradictions between evidence records."""

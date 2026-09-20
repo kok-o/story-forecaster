@@ -25,18 +25,23 @@ class EvidenceReducer:
     """
 
     @staticmethod
-    def resolve_chapter_num(cutoff_seq: int, db_session: Optional[Session] = None) -> int:
+    def resolve_chapter_num(
+        cutoff_seq: int,
+        db_session: Optional[Session] = None,
+        work_version_id: Optional[str] = None
+    ) -> int:
         """Determines chapter ordinal corresponding to the given cutoff discourse sequence."""
         if db_session:
             try:
                 from story_forecaster.db.models import Scene, Chapter
-                scene = (
+                query = (
                     db_session.query(Scene, Chapter)
                     .join(Chapter, Scene.chapter_id == Chapter.id)
                     .filter(Scene.discourse_seq <= cutoff_seq)
-                    .order_by(Scene.discourse_seq.desc())
-                    .first()
                 )
+                if work_version_id:
+                    query = query.filter(Chapter.work_version_id == work_version_id)
+                scene = query.order_by(Scene.discourse_seq.desc()).first()
                 if scene:
                     return scene[1].ordinal
             except Exception:
@@ -61,13 +66,15 @@ class EvidenceReducer:
         evidence_records: List[EvidenceRecord],
         threads: List[PlotThread],
         epistemic_states: List[CharacterEpistemicState],
-        db_session: Optional[Session] = None
+        db_session: Optional[Session] = None,
+        work_version_id: Optional[str] = None
     ) -> NarrativeSnapshot:
         """Computes an immutable NarrativeSnapshot at cutoff_seq from eligible evidence."""
-        # 1. Filter evidence strictly by reader availability
+        # 1. Filter evidence strictly by reader availability and work_version_id isolation
         permitted_evidence: List[EvidenceRecord] = [
             ev for ev in evidence_records
             if ev.reader_availability_seq <= cutoff_seq
+            and (ev.work_version_id is None or work_version_id is None or ev.work_version_id == work_version_id)
         ]
 
         # 2. Detect unresolved evidence contradictions
@@ -101,7 +108,8 @@ class EvidenceReducer:
         }
 
         # 7. Chapter resolution
-        ch_num = cls.resolve_chapter_num(cutoff_seq, db_session)
+        ch_num = cls.resolve_chapter_num(cutoff_seq, db_session, work_version_id=work_version_id)
+
 
         # 8. Deterministic snapshot hash
         raw_state = {

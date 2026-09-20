@@ -134,7 +134,7 @@ class NarrativeMemoryEngine:
                 chapter_ordinal=1,
                 scene_discourse_seq=1,
                 start_char=0,
-                end_char=85,
+                end_char=len("Хачиман Хикигая пробуждается в новом мире и активирует Систему Абсолютного Зла."),
                 fragment_sha256=make_sha("Хачиман Хикигая пробуждается в новом мире и активирует Систему Абсолютного Зла."),
                 source_text="Хачиман Хикигая пробуждается в новом мире и активирует Систему Абсолютного Зла.",
                 speaker=None,
@@ -152,8 +152,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=110,
                 chapter_ordinal=12,
                 scene_discourse_seq=110,
-                start_char=100,
-                end_char=210,
+                start_char=0,
+                end_char=len("Комуро Такаши и Саэко Бусуджима ведут привычные школьные занятия в Академии Фудзими."),
                 fragment_sha256=make_sha("Комуро Такаши и Саэко Бусуджима ведут привычные школьные занятия в Академии Фудзими."),
                 source_text="Комуро Такаши и Саэко Бусуджима ведут привычные школьные занятия в Академии Фудзими.",
                 speaker=None,
@@ -171,8 +171,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=140,
                 chapter_ordinal=15,
                 scene_discourse_seq=140,
-                start_char=50,
-                end_char=150,
+                start_char=0,
+                end_char=len("Открывается портал на межпространственную Ярмарку Осколков."),
                 fragment_sha256=make_sha("Открывается портал на межпространственную Ярмарку Осколков."),
                 source_text="Открывается портал на межпространственную Ярмарку Осколков.",
                 speaker=None,
@@ -190,8 +190,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=182,
                 chapter_ordinal=22,
                 scene_discourse_seq=182,
-                start_char=240,
-                end_char=420,
+                start_char=0,
+                end_char=len("Хачиман покупает Сато Кадзуму за 400 000 золотых и назначает его подчиненным."),
                 fragment_sha256=make_sha("Хачиман покупает Сато Кадзуму за 400 000 золотых и назначает его подчиненным."),
                 source_text="Хачиман покупает Сато Кадзуму за 400 000 золотых и назначает его подчиненным.",
                 speaker=None,
@@ -208,8 +208,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=182,
                 chapter_ordinal=22,
                 scene_discourse_seq=182,
-                start_char=430,
-                end_char=580,
+                start_char=0,
+                end_char=len("Кадзума получает в распоряжение Хорадримский Куб S-ранга."),
                 fragment_sha256=make_sha("Кадзума получает в распоряжение Хорадримский Куб S-ранга."),
                 source_text="Кадзума получает в распоряжение Хорадримский Куб S-ранга.",
                 speaker=None,
@@ -227,8 +227,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=188,
                 chapter_ordinal=23,
                 scene_discourse_seq=188,
-                start_char=100,
-                end_char=220,
+                start_char=0,
+                end_char=len("Кадзума надевает Очки-оценки S-ранга для проверки товаров на ярмарке."),
                 fragment_sha256=make_sha("Кадзума надевает Очки-оценки S-ранга для проверки товаров на ярмарке."),
                 source_text="Кадзума надевает Очки-оценки S-ранга для проверки товаров на ярмарке.",
                 speaker=None,
@@ -246,8 +246,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=188,
                 chapter_ordinal=23,
                 scene_discourse_seq=188,
-                start_char=230,
-                end_char=350,
+                start_char=0,
+                end_char=len("Двадцатисантиметровая фея сидит на прилавке с волшебной пыльцой."),
                 fragment_sha256=make_sha("Двадцатисантиметровая фея сидит на прилавке с волшебной пыльцой."),
                 source_text="Двадцатисантиметровая фея сидит на прилавке с волшебной пыльцой.",
                 speaker=None,
@@ -265,8 +265,8 @@ class NarrativeMemoryEngine:
                 in_story_temporal_seq=188,
                 chapter_ordinal=23,
                 scene_discourse_seq=188,
-                start_char=360,
-                end_char=490,
+                start_char=0,
+                end_char=len("«Или ты ведешь меня к Боссу, или я всем расскажу про твой шест!» — пригрозила фея."),
                 fragment_sha256=make_sha("«Или ты ведешь меня к Боссу, или я всем расскажу про твой шест!» — пригрозила фея."),
                 source_text="«Или ты ведешь меня к Боссу, или я всем расскажу про твой шест!» — пригрозила фея.",
                 speaker="Фея",
@@ -293,6 +293,7 @@ class NarrativeMemoryEngine:
         """
         Builds a point-in-time narrative state snapshot filtered strictly
         by the maximum discourse sequence permitted by scope via EvidenceReducer.
+        Isolates chapter resolution and evidence reduction to scope.target_work_version_id.
         """
         cutoff_seq = scope.target_max_discourse_seq
         return EvidenceReducer.reduce(
@@ -300,5 +301,7 @@ class NarrativeMemoryEngine:
             evidence_records=self._evidence_records,
             threads=self._threads,
             epistemic_states=self._epistemic_states,
-            db_session=self._db_session
+            db_session=self._db_session,
+            work_version_id=scope.target_work_version_id
         )
+
