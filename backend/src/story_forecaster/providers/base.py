@@ -4,6 +4,10 @@ from ..domain.scope import ForecastScope
 from ..domain.forecast import ForecastResult, PredictionCandidate
 from ..domain.canon import ReferenceClassification
 
+class ProviderUnavailableError(RuntimeError):
+    """Raised when an explicitly requested LLM provider is unavailable."""
+    pass
+
 class BaseLLMProvider(ABC):
     """Abstract interface for LLM operations in the pipeline."""
 

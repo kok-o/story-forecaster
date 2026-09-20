@@ -24,9 +24,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -39,17 +44,17 @@ def get_db():
 
 # Request Models
 class SearchRequest(BaseModel):
-    query: str = Field(..., min_length=1, description="Поисковый запрос")
-    cutoff_chapter: int = Field(23, ge=1, description="Номер граничной главы")
+    query: str = Field(..., min_length=1, max_length=500, description="Поисковый запрос")
+    cutoff_chapter: int = Field(23, ge=1, le=1000, description="Номер граничной главы")
     top_k: int = Field(10, ge=1, le=50, description="Количество результатов")
 
 class ForecastRequest(BaseModel):
-    cutoff_chapter: int = Field(23, ge=1, description="Номер граничной главы")
+    cutoff_chapter: int = Field(23, ge=1, le=1000, description="Номер граничной главы")
     num_candidates: int = Field(3, ge=1, le=10, description="Количество кандидатов")
     provider_name: Literal["demo", "gemini"] = Field("demo", description="Провайдер генерации гипотез")
 
 class BacktestRequest(BaseModel):
-    cutoff_chapter: int = Field(22, ge=1, description="Номер граничной главы для бэктеста")
+    cutoff_chapter: int = Field(22, ge=1, le=1000, description="Номер граничной главы для бэктеста")
     provider_name: Literal["demo", "gemini"] = Field("demo", description="Провайдер генерации гипотез")
 
 @app.get("/api/health")
@@ -106,7 +111,7 @@ def get_chapters(db: Session = Depends(get_db)):
     return results
 
 @app.get("/api/canon/summary")
-def get_canon_summary(cutoff_chapter: int = 23, db: Session = Depends(get_db)):
+def get_canon_summary(cutoff_chapter: int = Query(23, ge=1, le=1000), db: Session = Depends(get_db)):
     registry = CanonDivergenceRegistry()
     target_ch = db.query(Chapter).filter_by(ordinal=cutoff_chapter).first()
     max_seq = 192
@@ -179,17 +184,11 @@ def run_forecast(req: ForecastRequest, db: Session = Depends(get_db)):
         mode="retrospective"
     )
 
-    if req.provider_name == "gemini":
-        from story_forecaster.providers.gemini import GeminiProvider
-        provider = GeminiProvider()
-        if not provider.is_available():
-            raise HTTPException(
-                status_code=400,
-                detail="Gemini provider selected, but GEMINI_API_KEY is not set or google-genai is not installed in the environment."
-            )
-    else:
-        from story_forecaster.providers.demo import DemoProvider
-        provider = DemoProvider()
+    try:
+        from story_forecaster.providers import get_provider, ProviderUnavailableError
+        provider = get_provider(provider_name=req.provider_name)
+    except ProviderUnavailableError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     engine = ForecastEngine(provider=provider)
     result = engine.run_forecast(scope=scope, num_candidates=req.num_candidates, persist_run=True)
@@ -228,8 +227,12 @@ def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
         mode="retrospective"
     )
 
-    from story_forecaster.providers import get_provider
-    provider = get_provider(prefer_gemini=(req.provider_name == "gemini"))
+    try:
+        from story_forecaster.providers import get_provider, ProviderUnavailableError
+        provider = get_provider(provider_name=req.provider_name)
+    except ProviderUnavailableError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     engine = ForecastEngine(provider=provider)
     result = engine.run_forecast(scope=scope, num_candidates=3, persist_run=True)
 
@@ -238,7 +241,7 @@ def run_backtest(req: BacktestRequest, db: Session = Depends(get_db)):
     return report
 
 @app.get("/api/memory/snapshot")
-def get_memory_snapshot(cutoff_chapter: int = Query(23, ge=1), db: Session = Depends(get_db)):
+def get_memory_snapshot(cutoff_chapter: int = Query(23, ge=1, le=1000), db: Session = Depends(get_db)):
     work = db.query(Work).filter_by(role="target").first()
     if not work:
         raise HTTPException(status_code=404, detail="Target work not found")

@@ -24,9 +24,10 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 from story_forecaster.ingestion.importer import import_target_work
-from story_forecaster.db import SessionLocal, Project, Work, Chapter, Scene, Run, Candidate
+from story_forecaster.db import SessionLocal, Project, Work, WorkVersion, Chapter, Scene, Run, Candidate
 from story_forecaster.domain.scope import ForecastScope
-from story_forecaster.providers import get_provider
+from story_forecaster.providers import get_provider, ProviderUnavailableError
+from story_forecaster.config import get_settings
 
 app = typer.Typer(help="Story Forecaster CLI for Author N.B. and 'Система Абсолютного З.Л.А.'")
 console = Console()
@@ -35,12 +36,12 @@ console = Console()
 def doctor(
     probe_api: bool = typer.Option(False, "--probe-api", help="Perform live Gemini API probe if GEMINI_API_KEY is configured")
 ):
-    """Diagnoses system readiness: checks database, directories, meta-corpus, frontend, and providers."""
+    """Diagnoses system readiness: checks configuration, database, directories, meta-corpus, frontend, and providers."""
     from pathlib import Path
     
     console.print(Panel.fit(
         "[bold cyan]Story Forecaster System Health & Readiness Doctor[/bold cyan]\n"
-        "Verifying dependencies, database integrity, file corpus, and forecast pipelines...",
+        "Verifying dependencies, configuration, database integrity, file corpus, and forecast pipelines...",
         border_style="cyan"
     ))
     
@@ -49,15 +50,29 @@ def doctor(
     table.add_column("Статус", style="bold")
     table.add_column("Детализация", style="white")
 
+    has_critical_error = False
+
     # 1. Python environment
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     table.add_row("Python Environment", "[green]OK[/green]", f"Python {py_ver} ({sys.platform})")
 
+    # 2. Configuration & Schema validation
+    settings = None
+    try:
+        settings = get_settings(reload=True)
+        table.add_row(
+            "Configuration (settings.yaml)",
+            "[green]OK[/green]",
+            f"Validated via Pydantic: mode={settings.app.mode}, model={settings.llm.model}, timeout={settings.llm.timeout_seconds}s"
+        )
+    except Exception as e:
+        table.add_row("Configuration (settings.yaml)", "[red]FAILED[/red]", f"Validation error: {e}")
+        has_critical_error = True
+
     project_root = Path(__file__).resolve().parents[3]
 
-    # 2. Database & Schema
+    # 3. Database & Schema
     db_ok = False
-    db_details = "N/A"
     try:
         db = SessionLocal()
         work = db.query(Work).filter_by(role="target").first()
@@ -70,8 +85,9 @@ def doctor(
         table.add_row("Database (SQLite/ORM)", "[green]OK[/green]", db_details)
     except Exception as e:
         table.add_row("Database (SQLite/ORM)", "[red]FAILED[/red]", str(e))
+        has_critical_error = True
 
-    # 3. Chapters directory & manifest
+    # 4. Chapters directory & manifest
     target_dir = project_root / "data" / "target" / "chapters"
     manifest_file = target_dir / "manifest.json"
     if manifest_file.exists():
@@ -80,7 +96,7 @@ def doctor(
     else:
         table.add_row("Target Corpus (Chapters)", "[yellow]WARNING[/yellow]", f"Missing manifest at {manifest_file}")
 
-    # 4. Meta-Corpus FB2 directories
+    # 5. Meta-Corpus FB2 directories
     meta_folders = [
         "NB-neudacha",
         "NB-obnovlennyy-mir",
@@ -94,7 +110,7 @@ def doctor(
     else:
         table.add_row("Meta-Corpus (N.B. 13 FB2)", "[yellow]PARTIAL[/yellow]", f"Found {len(found_meta)}/{len(meta_folders)} cycles")
 
-    # 5. Frontend assets
+    # 6. Frontend assets
     frontend_dir = project_root / "frontend"
     has_html = (frontend_dir / "index.html").exists()
     has_js = (frontend_dir / "app.js").exists()
@@ -104,18 +120,36 @@ def doctor(
     else:
         table.add_row("Web UI Frontend", "[red]MISSING[/red]", "Incomplete frontend assets")
 
-    # 6. Provider status
+    # 7. Provider status & real network probe
     has_key = bool(os.environ.get("GEMINI_API_KEY"))
     if probe_api:
         if has_key:
-            table.add_row("LLM Provider Probe", "[green]ACTIVE[/green]", "GEMINI_API_KEY detected in environment")
+            try:
+                from google import genai
+                client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+                model_name = settings.llm.model if settings else "gemini-3.8-flash"
+                client.models.generate_content(
+                    model=model_name,
+                    contents="Ping. Respond with 'PONG'."
+                )
+                table.add_row("LLM Provider Probe", "[green]VERIFIED[/green]", f"Live API probe passed (model: {model_name})")
+            except Exception as e:
+                table.add_row("LLM Provider Probe", "[red]FAILED[/red]", f"Live API probe error: {e}")
+                has_critical_error = True
         else:
-            table.add_row("LLM Provider Probe", "[yellow]SKIPPED[/yellow]", "No GEMINI_API_KEY set (falling back to DemoProvider)")
+            table.add_row("LLM Provider Probe", "[yellow]SKIPPED[/yellow]", "GEMINI_API_KEY not set in environment (cannot probe live API)")
     else:
-        table.add_row("LLM Provider Default", "[green]READY[/green]", "DemoProvider + Gemini analytical engine (offline deterministic)")
+        if has_key:
+            table.add_row("LLM Provider Default", "[green]CONFIGURED[/green]", "GEMINI_API_KEY detected in environment")
+        else:
+            table.add_row("LLM Provider Default", "[yellow]OFFLINE DEMO[/yellow]", "DemoProvider active (offline deterministic fixtures)")
 
     console.print(table)
-    console.print("[bold green]System check completed: Ready for forecast, backtest, and ablation pipelines.[/bold green]\n")
+    if has_critical_error:
+        console.print("[bold red]System health check failed: Please resolve critical errors above.[/bold red]\n")
+        raise typer.Exit(code=1)
+    else:
+        console.print("[bold green]System check completed: Ready for forecast, backtest, and ablation pipelines.[/bold green]\n")
 
 @app.command()
 def ingest(
@@ -160,7 +194,7 @@ def inspect(
 @app.command()
 def forecast(
     cutoff_chapter: int = typer.Option(23, help="Forecast continuation after this chapter"),
-    provider_name: str = typer.Option("auto", help="Provider: 'auto', 'demo', or 'gemini'")
+    provider_name: str = typer.Option("demo", help="Provider: 'demo', 'gemini', or 'auto'")
 ):
     """Generates 3-5 prospective chapter candidates honoring zero-leakage scope."""
     db = SessionLocal()
@@ -170,8 +204,14 @@ def forecast(
             console.print("[red]No target work found. Run 'ingest' first.[/red]")
             return
 
-        # Find the max discourse_seq for the requested cutoff_chapter
-        target_ch = db.query(Chapter).filter_by(ordinal=cutoff_chapter).first()
+        latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
+        version_id = latest_ver.id if latest_ver else work.id
+
+        # Find the max discourse_seq for the requested cutoff_chapter in this version
+        target_ch = db.query(Chapter).filter(
+            (Chapter.work_version_id == version_id) if latest_ver else True,
+            Chapter.ordinal == cutoff_chapter
+        ).first()
         if not target_ch:
             console.print(f"[red]Chapter {cutoff_chapter} not found.[/red]")
             return
@@ -181,7 +221,7 @@ def forecast(
 
         scope = ForecastScope(
             project_id=work.project_id,
-            target_work_version_id=work.id,
+            target_work_version_id=version_id,
             target_max_discourse_seq=max_seq,
             mode="retrospective"
         )
@@ -189,13 +229,20 @@ def forecast(
         console.print(Panel.fit(
             f"[bold cyan]Story Forecaster Engine[/bold cyan]\n"
             f"Произведение: [yellow]{work.title}[/yellow]\n"
+            f"Версия: [cyan]{version_id}[/cyan]\n"
             f"Точка отсечки: [green]Конец главы {cutoff_chapter} (discourse_seq <= {max_seq})[/green]\n"
-            f"Изоляция будущего: [bold green]АКТИВНА[/bold green] (главы > {cutoff_chapter} заблокированы)",
+            f"Провайдер: [magenta]{provider_name}[/magenta]",
             border_style="cyan"
         ))
 
         from story_forecaster.forecast.engine import ForecastEngine
-        engine = ForecastEngine(provider=get_provider(prefer_gemini=(provider_name == "gemini")))
+        try:
+            provider = get_provider(provider_name=provider_name)
+        except ProviderUnavailableError as e:
+            console.print(f"[bold red]Ошибка провайдера:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+        engine = ForecastEngine(provider=provider)
         result = engine.run_forecast(scope=scope, num_candidates=3, persist_run=True)
 
         for idx, cand in enumerate(result.candidates, start=1):
@@ -265,7 +312,13 @@ def search(
             console.print("[red]No target work found. Run 'ingest' first.[/red]")
             return
 
-        target_ch = db.query(Chapter).filter_by(ordinal=cutoff_chapter).first()
+        latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
+        version_id = latest_ver.id if latest_ver else work.id
+
+        target_ch = db.query(Chapter).filter(
+            (Chapter.work_version_id == version_id) if latest_ver else True,
+            Chapter.ordinal == cutoff_chapter
+        ).first()
         if not target_ch:
             console.print(f"[red]Chapter {cutoff_chapter} not found.[/red]")
             return
@@ -275,7 +328,7 @@ def search(
 
         scope = ForecastScope(
             project_id=work.project_id,
-            target_work_version_id=work.id,
+            target_work_version_id=version_id,
             target_max_discourse_seq=max_seq,
             mode="retrospective"
         )
@@ -287,6 +340,7 @@ def search(
         console.print(Panel.fit(
             f"[bold cyan]Hybrid Scope Search[/bold cyan]\n"
             f"Запрос: [yellow]{query}[/yellow]\n"
+            f"Версия: [cyan]{version_id}[/cyan]\n"
             f"Граница отсечки: [green]Конец главы {cutoff_chapter} (discourse_seq <= {max_seq})[/green]\n"
             f"Найдено релевантных сцен: [magenta]{len(results)}[/magenta]",
             border_style="cyan"
@@ -315,7 +369,7 @@ def search(
 @app.command()
 def backtest(
     cutoff_chapter: int = typer.Option(22, help="Cutoff chapter (forecasts chapter cutoff+1 as hidden test)"),
-    provider_name: str = typer.Option("auto", help="Provider: 'auto', 'demo', or 'gemini'")
+    provider_name: str = typer.Option("demo", help="Provider: 'demo', 'gemini', or 'auto'")
 ):
     """Executes a blind backtest comparing forecasted candidates against held-out gold chapter events."""
     db = SessionLocal()
@@ -325,7 +379,13 @@ def backtest(
             console.print("[red]No target work found. Run 'ingest' first.[/red]")
             return
 
-        target_ch = db.query(Chapter).filter_by(ordinal=cutoff_chapter).first()
+        latest_ver = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
+        version_id = latest_ver.id if latest_ver else work.id
+
+        target_ch = db.query(Chapter).filter(
+            (Chapter.work_version_id == version_id) if latest_ver else True,
+            Chapter.ordinal == cutoff_chapter
+        ).first()
         if not target_ch:
             console.print(f"[red]Chapter {cutoff_chapter} not found.[/red]")
             return
@@ -343,7 +403,7 @@ def backtest(
 
         scope = ForecastScope(
             project_id=work.project_id,
-            target_work_version_id=work.id,
+            target_work_version_id=version_id,
             target_max_discourse_seq=max_seq,
             mode="retrospective"
         )
@@ -351,14 +411,21 @@ def backtest(
         console.print(Panel.fit(
             f"[bold cyan]Story Forecaster Backtest Benchmark[/bold cyan]\n"
             f"Произведение: [yellow]{work.title}[/yellow]\n"
+            f"Версия: [cyan]{version_id}[/cyan]\n"
             f"Граница разрешенного контекста: [green]Конец главы {cutoff_chapter} (discourse_seq <= {max_seq})[/green]\n"
             f"Скрытая тестируемая глава: [bold magenta]Глава {hidden_chapter_num}[/bold magenta]\n"
-            f"Защита от утечки будущего: [bold green]АКТИВНА[/bold green]",
+            f"Провайдер: [magenta]{provider_name}[/magenta]",
             border_style="cyan"
         ))
 
         from story_forecaster.forecast.engine import ForecastEngine
-        engine = ForecastEngine(provider=get_provider(prefer_gemini=(provider_name == "gemini")))
+        try:
+            provider = get_provider(provider_name=provider_name)
+        except ProviderUnavailableError as e:
+            console.print(f"[bold red]Ошибка провайдера:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+        engine = ForecastEngine(provider=provider)
         result = engine.run_forecast(scope=scope, num_candidates=3, persist_run=True)
 
         evaluator = BacktestEvaluator()

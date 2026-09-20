@@ -112,4 +112,11 @@ def test_api_forecast_gemini_unconfigured_error():
     assert res.status_code == 400
     assert "Gemini provider selected, but GEMINI_API_KEY is not set" in res.json()["detail"]
 
+def test_api_backtest_gemini_unconfigured_error():
+    client = TestClient(app)
+    res = client.post("/api/backtest", json={"cutoff_chapter": 22, "provider_name": "gemini"})
+    assert res.status_code == 400
+    assert "Gemini provider selected, but GEMINI_API_KEY is not set" in res.json()["detail"]
+
+
 

@@ -96,8 +96,11 @@ source .venv/bin/activate
 # On Windows PowerShell:
 .venv\Scripts\Activate.ps1
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies and editable package
+pip install -e .
+
+# Optional: install development dependencies for tests
+pip install -e ".[dev]"
 ```
 
 ### 2. Configure Environment (Optional for Live LLM)
@@ -112,21 +115,18 @@ GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-3.8-flash
 PORT=8000
 ```
-Note: If no API key is configured, Story Forecaster seamlessly operates using the offline `--provider demo` mode.
+Note: If no API key is configured, Story Forecaster operates deterministically in offline `--provider demo` mode.
 
 ### 3. Run Test Suite
 ```bash
 pytest
 ```
-All 43 unit and integration tests execute against an isolated in-memory SQLite fixture.
+All 47 unit and integration tests execute against an isolated SQLite test fixture.
 
 ### 4. Launch Web UI and REST API
 ```bash
-# On Linux / macOS:
-PYTHONPATH="backend/src" python -m story_forecaster.cli serve --port 8000
-
-# On Windows PowerShell:
-$env:PYTHONPATH="backend/src"
+story-forecaster serve --port 8000
+# or
 python -m story_forecaster.cli serve --port 8000
 ```
 
