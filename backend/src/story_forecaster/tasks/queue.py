@@ -17,7 +17,8 @@ class TaskQueue:
         session: Session,
         task_type: str,
         params: Dict[str, Any],
-        project_id: Optional[str] = None
+        project_id: Optional[str] = None,
+        max_cost_limit_usd: float = 0.50
     ) -> AsyncTask:
         """Enqueues a new asynchronous job."""
         task = AsyncTask(
@@ -26,6 +27,7 @@ class TaskQueue:
             status="QUEUED",
             progress_pct=0,
             cost_usd=0.0,
+            max_cost_limit_usd=max_cost_limit_usd,
             params_json=params,
             result_json={}
         )
@@ -93,7 +95,7 @@ class TaskQueue:
         self,
         session: Session,
         task_id: str,
-        max_cost_limit_usd: float = 0.50
+        max_cost_limit_usd: Optional[float] = None
     ) -> AsyncTask:
         """
         Executes a job to completion or respects cancellation and budget caps.
@@ -104,6 +106,8 @@ class TaskQueue:
 
         if task.status == "CANCELLED":
             return task
+
+        effective_limit = max_cost_limit_usd if max_cost_limit_usd is not None else getattr(task, "max_cost_limit_usd", 0.50)
 
         task.status = "RUNNING"
         session.commit()
@@ -124,9 +128,9 @@ class TaskQueue:
                     return task
 
                 # Check budget limit
-                if (task.cost_usd + unit_cost) > max_cost_limit_usd:
+                if (task.cost_usd + unit_cost) > effective_limit:
                     task.status = "FAILED"
-                    task.error_message = f"Budget cap exceeded: {task.cost_usd} USD >= {max_cost_limit_usd} USD limit."
+                    task.error_message = f"Budget cap exceeded: {task.cost_usd} USD >= {effective_limit} USD limit."
                     session.commit()
                     return task
 

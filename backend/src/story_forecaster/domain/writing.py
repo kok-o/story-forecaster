@@ -62,6 +62,8 @@ class ProposedStateDelta(BaseModel):
     )
     validation_status: str = Field("PENDING", description="'PENDING', 'VALIDATED', 'REJECTED'")
     validation_notes: Optional[str] = None
+    provider_name: Optional[str] = None
+    is_synthetic_demonstration: bool = False
 
 class SceneValidationResult(BaseModel):
     """
@@ -75,3 +77,30 @@ class SceneValidationResult(BaseModel):
     timeline_violations: List[str] = Field(default_factory=list, description="Inconsistencies with preceding sequence")
     factual_errors: List[str] = Field(default_factory=list, description="Factual contradictions with established branch state")
     notes: str = ""
+
+class SceneSynthesisOutput(BaseModel):
+    """
+    Structured response schema for LLM scene synthesis:
+    Returns both literary narrative prose and extracted state deltas with verbatim quotes.
+    """
+    prose: str = Field(..., description="Full Russian literary narrative scene prose fulfilling plan beats and adhering to character voices")
+    inventory_changes: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of dicts: {'character': str, 'item': str, 'action': 'acquired'|'lost'|'equipped', 'span_quote': str}"
+    )
+    injuries_or_statuses: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of dicts: {'character': str, 'status': str, 'action': 'applied'|'healed'|'canceled', 'span_quote': str}"
+    )
+    epistemic_updates: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of dicts: {'character': str, 'fact_key': str, 'attitude': str, 'span_quote': str}"
+    )
+    dialogue_claims: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of dicts: {'speaker': str, 'statement': str, 'is_world_fact': False, 'span_quote': str}"
+    )
+    introduced_characters: List[str] = Field(
+        default_factory=list,
+        description="Characters introduced for the first time in this scene"
+    )

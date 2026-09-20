@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 from ..domain.scope import ForecastScope
 from ..domain.forecast import ForecastResult, PredictionCandidate
 from ..domain.canon import ReferenceClassification
+from ..domain.writing import ScenePlan, CharacterVoiceProfile
+from ..domain.memory import NarrativeSnapshot
 
 class ProviderUnavailableError(RuntimeError):
     """Raised when an explicitly requested LLM provider is unavailable."""
@@ -27,3 +29,18 @@ class BaseLLMProvider(ABC):
     def classify_reference(self, entity_text: str, context_sentence: str) -> ReferenceClassification:
         """Classifies a potential cross-fandom reference."""
         pass
+
+    def synthesize_scene_prose(
+        self,
+        plan: ScenePlan,
+        snapshot: NarrativeSnapshot,
+        voice_profiles: List[CharacterVoiceProfile],
+        recent_scenes: Optional[List[Dict[str, Any]]] = None
+    ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Synthesizes narrative prose for a ScenePlan and extracts structured state deltas.
+        Returns:
+            Tuple of (prose_text, delta_dict)
+        """
+        raise NotImplementedError("This provider does not implement scene prose synthesis.")
+

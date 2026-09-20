@@ -324,8 +324,8 @@ def draft_scene(branch_id: str, req: DraftSceneRequest, db: Session = Depends(ge
     try:
         from story_forecaster.providers import get_provider
         provider = get_provider(provider_name=req.provider_name)
-    except Exception:
-        provider = None
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     try:
         scene, validation, delta = service.draft_scene(
@@ -351,12 +351,15 @@ def draft_scene(branch_id: str, req: DraftSceneRequest, db: Session = Depends(ge
     }
 
 @app.post("/api/writing/scenes/{scene_id}/accept")
-def accept_scene(scene_id: str, db: Session = Depends(get_db)):
+def accept_scene(scene_id: str, force_override: bool = Query(False), db: Session = Depends(get_db)):
     service = BranchService()
     try:
-        scene = service.accept_scene(db, scene_id)
+        scene = service.accept_scene(db, scene_id, force_override=force_override)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        detail = str(e)
+        if "not found" in detail.lower():
+            raise HTTPException(status_code=404, detail=detail)
+        raise HTTPException(status_code=422, detail=detail)
     return {"id": scene.id, "status": scene.status, "message": "Scene accepted successfully."}
 
 @app.post("/api/writing/scenes/{scene_id}/reject")
@@ -481,7 +484,12 @@ def list_tasks(db: Session = Depends(get_db)):
 @app.post("/api/tasks")
 def enqueue_task(req: EnqueueTaskRequest, db: Session = Depends(get_db)):
     queue = TaskQueue()
-    task = queue.enqueue(session=db, task_type=req.task_type, params=req.params)
+    task = queue.enqueue(
+        session=db,
+        task_type=req.task_type,
+        params=req.params,
+        max_cost_limit_usd=req.max_cost_limit_usd
+    )
     return {"task_id": task.id, "status": task.status, "progress_pct": task.progress_pct}
 
 @app.post("/api/tasks/{task_id}/run")

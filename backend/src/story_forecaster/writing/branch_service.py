@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 
@@ -129,19 +130,72 @@ class BranchService:
 
         return branch_scene, validation, delta
 
-    def accept_scene(self, session: Session, scene_id: str) -> BranchScene:
+    def accept_scene(self, session: Session, scene_id: str, force_override: bool = False) -> BranchScene:
         """
         Formally accepts a drafted scene, transitioning it to ACCEPTED.
         Only accepted scenes mutate the branch's downstream narrative snapshot.
+        Enforces validation: fails if the scene did not pass validation, unless force_override=True.
+        Atomically supersedes any previous ACCEPTED revision for the same scene_ordinal.
         """
         scene = session.query(BranchScene).filter(BranchScene.id == scene_id).one_or_none()
         if not scene:
             raise ValueError(f"BranchScene '{scene_id}' not found.")
 
+        # 1. Validate scene integrity against previous snapshot
+        plan = ScenePlan.model_validate(scene.scene_plan_json)
+        snapshot = self.get_branch_snapshot(session, scene.branch_id, through_scene_ordinal=scene.scene_ordinal - 1)
+        validation = self.validator.validate_scene(plan=plan, content=scene.content, snapshot=snapshot)
+
+        # Delta citation validation
+        delta_dict = scene.state_delta_json or {}
+        unverified_spans = []
+        norm_content = re.sub(r"[^\w\s]", "", scene.content.lower())
+        for category in ["inventory_changes", "injuries_or_statuses", "dialogue_claims"]:
+            for item in delta_dict.get(category, []):
+                quote = item.get("span_quote")
+                if quote and quote != "ABSENT":
+                    norm_quote = re.sub(r"[^\w\s]", "", quote.lower()).strip()
+                    if norm_quote and norm_quote not in norm_content:
+                        unverified_spans.append(f"Unverified quote in delta: '{quote}'")
+                elif quote == "ABSENT":
+                    unverified_spans.append(f"Uncited state change in delta: '{item.get('item') or item.get('status') or 'unknown'}'")
+
+        if (not validation.passed or unverified_spans) and not force_override:
+            violations_detail = list(unverified_spans)
+            if validation.pov_violations:
+                violations_detail.append(f"POV violations: {', '.join(validation.pov_violations)}")
+            if validation.epistemic_violations:
+                violations_detail.append(f"Epistemic violations: {', '.join(validation.epistemic_violations)}")
+            if getattr(validation, "timeline_violations", None):
+                violations_detail.append(f"Timeline violations: {', '.join(validation.timeline_violations)}")
+            if getattr(validation, "factual_errors", None):
+                violations_detail.append(f"Factual errors: {', '.join(validation.factual_errors)}")
+            if validation.plan_compliance_score < 0.70:
+                violations_detail.append(f"Low beat compliance: {int(validation.plan_compliance_score * 100)}%")
+            error_msg = f"Cannot accept scene '{scene_id}': validation failed. " + "; ".join(violations_detail or [validation.notes or "Constraint violations"])
+            raise ValueError(error_msg)
+
+        # 2. Supersede any other ACCEPTED revision for this scene_ordinal in the branch
+        other_accepted = (
+            session.query(BranchScene)
+            .filter(
+                BranchScene.branch_id == scene.branch_id,
+                BranchScene.scene_ordinal == scene.scene_ordinal,
+                BranchScene.id != scene.id,
+                BranchScene.status == "ACCEPTED"
+            )
+            .all()
+        )
+        for prev in other_accepted:
+            prev.status = "SUPERSEDED"
+
+        # 3. Mark current scene as ACCEPTED
         scene.status = "ACCEPTED"
         if scene.state_delta_json:
             delta_dict = dict(scene.state_delta_json)
             delta_dict["validation_status"] = "ACCEPTED"
+            if force_override and not validation.passed:
+                delta_dict["validation_override"] = True
             scene.state_delta_json = delta_dict
 
         session.commit()
@@ -178,15 +232,14 @@ class BranchService:
     ) -> Tuple[BranchScene, SceneValidationResult, ProposedStateDelta]:
         """
         Replaces a scene with a new revision:
-        - Marks old scene revision as SUPERSEDED.
         - Creates new BranchScene with incremented revision_num.
         - Recomputes delta and runs validation.
+        - If validation passes, marks old scene as SUPERSEDED and new scene as ACCEPTED.
+        - If validation FAILS, leaves old scene in its previous state (ACCEPTED), and keeps new scene as DRAFT.
         """
         old_scene = session.query(BranchScene).filter(BranchScene.id == scene_id).one_or_none()
         if not old_scene:
             raise ValueError(f"BranchScene '{scene_id}' not found.")
-
-        old_scene.status = "SUPERSEDED"
 
         plan = new_plan or ScenePlan.model_validate(old_scene.scene_plan_json)
         snapshot = self.get_branch_snapshot(session, old_scene.branch_id, through_scene_ordinal=old_scene.scene_ordinal - 1)
@@ -199,6 +252,13 @@ class BranchService:
         )
         validation = self.validator.validate_scene(plan=plan, content=new_content, snapshot=snapshot)
 
+        if validation.passed:
+            if old_scene.status == "ACCEPTED":
+                old_scene.status = "SUPERSEDED"
+            new_status = "ACCEPTED"
+        else:
+            new_status = "DRAFT"
+
         new_scene = BranchScene(
             branch_id=old_scene.branch_id,
             scene_ordinal=old_scene.scene_ordinal,
@@ -206,7 +266,7 @@ class BranchService:
             title=old_scene.title,
             scene_plan_json=plan.model_dump(),
             content=new_content,
-            status="ACCEPTED" if validation.passed else "DRAFT",
+            status=new_status,
             state_delta_json=delta.model_dump()
         )
         session.add(new_scene)

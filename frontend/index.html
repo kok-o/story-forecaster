@@ -230,6 +230,13 @@
                 <input type="text" id="plan-scene-outcome" class="input-field" style="width: 100%; margin-top: 0.25rem;" value="Кадзума нанят и принял привязку артефакта.">
               </div>
             </div>
+            <div style="margin-bottom: 1.25rem;">
+              <label style="font-size: 0.85rem; color: var(--text-secondary);">Движок генерации (LLM Provider):</label>
+              <select id="plan-scene-provider" class="input-field" style="width: 100%; margin-top: 0.25rem;">
+                <option value="demo">Deterministic Demo (Офлайн-шаблон без внешнего API)</option>
+                <option value="gemini">Google Gemini (Реальный синтез с речевыми манерами)</option>
+              </select>
+            </div>
             <button class="btn-primary" id="btn-draft-scene" onclick="draftSceneFromPlan()">⚡ Сгенерировать черновик (Draft Scene)</button>
           </div>
 
@@ -240,6 +247,7 @@
                 <div>
                   <span class="badge" id="scene-detail-status-badge">ACCEPTED</span>
                   <span class="badge badge-purple" id="scene-detail-rev-badge">Ревизия 1</span>
+                  <span class="badge" id="scene-detail-provider-badge">ДЕМО-ШАБЛОН</span>
                   <h2 style="font-size: 1.3rem; margin-top: 0.5rem;" id="scene-detail-title">Заголовок сцены</h2>
                 </div>
                 <div style="display: flex; gap: 0.5rem;" id="scene-actions-container">

@@ -85,14 +85,16 @@ async function loadForecast() {
     const data = await res.json();
     renderForecastCandidates(data.candidates, data.recommended_candidate_id, container, data);
 
-    if (cutoff === 24) {
+    const winningCandidate = (data.candidates || []).find(c => c.candidate_id === data.recommended_candidate_id) || (data.candidates || [])[0];
+    if (winningCandidate && (winningCandidate.narrative_prose || (winningCandidate.key_events && winningCandidate.key_events.length > 0))) {
       proseSection.style.display = 'block';
-      if (proseTitle) proseTitle.textContent = '📖 Художественный образец к Главе 25 (референсный драфт)';
-      proseBody.innerHTML = CHAPTER_25_PROSE.split('\n\n').map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
-    } else if (cutoff === 23) {
-      proseSection.style.display = 'block';
-      if (proseTitle) proseTitle.textContent = '📖 Художественный образец к Главе 24 (референсный драфт)';
-      proseBody.innerHTML = CHAPTER_24_PROSE.split('\n\n').map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
+      if (proseTitle) proseTitle.textContent = `📖 Сюжетный образец главы ${cutoff + 1} (${escapeHtml(winningCandidate.title || 'Рекомендованная гипотеза')})`;
+      if (winningCandidate.narrative_prose) {
+        proseBody.innerHTML = winningCandidate.narrative_prose.split('\n\n').map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
+      } else {
+        const eventsList = (winningCandidate.key_events || []).map(e => `<li><strong>Бит #${e.ordinal}:</strong> ${escapeHtml(e.summary)} <em>(${escapeHtml((e.participants || []).join(', '))})</em></li>`).join('');
+        proseBody.innerHTML = `<p>${escapeHtml(winningCandidate.rationale || 'Прогнозируемая структура развития сюжета:')}</p><ul style="margin-left: 1.5rem; line-height: 1.6;">${eventsList}</ul>`;
+      }
     } else {
       proseSection.style.display = 'none';
     }
@@ -571,14 +573,22 @@ function selectScene(scene) {
   else if (scene.status === 'REJECTED') statusBadge.classList.add('badge-rejected');
   else if (scene.status === 'SUPERSEDED') statusBadge.classList.add('badge-superseded');
 
+  // Proposed State Delta Breakdown & Provider Badge
+  const delta = scene.state_delta || {};
+  const providerBadge = document.getElementById('scene-detail-provider-badge');
+  if (providerBadge) {
+    const isSynthetic = delta.is_synthetic_demonstration;
+    const provName = delta.provider_name || (isSynthetic ? 'demo' : 'llm');
+    providerBadge.textContent = isSynthetic ? 'ДЕМО-ШАБЛОН' : `LLM: ${provName.toUpperCase()}`;
+    providerBadge.className = 'badge ' + (isSynthetic ? 'badge-yellow' : 'badge-green');
+  }
+
   // Prose
   document.getElementById('scene-detail-prose').innerHTML = scene.content
     .split('\n\n')
     .map(p => `<p>${escapeHtml(p)}</p>`)
     .join('');
 
-  // Proposed State Delta Breakdown
-  const delta = scene.state_delta || {};
   const deltaContainer = document.getElementById('delta-items-container');
   const deltaHtml = [];
 
@@ -657,6 +667,7 @@ async function draftSceneFromPlan() {
   const beats = document.getElementById('plan-scene-beats').value.split('\n').map(s => s.trim()).filter(Boolean);
   const initial = document.getElementById('plan-scene-initial').value;
   const outcome = document.getElementById('plan-scene-outcome').value;
+  const providerName = document.getElementById('plan-scene-provider')?.value || 'demo';
 
   const btn = document.getElementById('btn-draft-scene');
   btn.disabled = true;
@@ -669,6 +680,7 @@ async function draftSceneFromPlan() {
       body: JSON.stringify({
         scene_ordinal: ordinal,
         title: title,
+        provider_name: providerName,
         plan: {
           scene_goal: title,
           pov_character: pov,
@@ -695,11 +707,12 @@ async function draftSceneFromPlan() {
     const val = data.validation || {};
     const valTitle = document.getElementById('val-banner-title');
     const valNotes = document.getElementById('val-banner-notes');
+    const complianceScore = Number.isFinite(val.plan_compliance_score) ? val.plan_compliance_score : (val.passed ? 1.0 : 0.0);
     if (val.passed) {
-      valTitle.textContent = `✓ Валидация пройдена: исполнение битов ${Math.round((val.plan_compliance_score || 1) * 100)}%`;
+      valTitle.textContent = `✓ Валидация пройдена: исполнение битов ${Math.round(complianceScore * 100)}%`;
       valTitle.style.color = 'var(--accent-green)';
     } else {
-      valTitle.textContent = `⚠ Валидация выявила отклонения (${Math.round((val.plan_compliance_score || 0) * 100)}%)`;
+      valTitle.textContent = `⚠ Валидация выявила отклонения (${Math.round(complianceScore * 100)}%)`;
       valTitle.style.color = 'var(--accent-red)';
     }
     valNotes.textContent = `POV-утечки: ${(val.pov_violations || []).length} • Эпистемические нарушения: ${(val.epistemic_violations || []).length} • ${val.notes || ''}`;

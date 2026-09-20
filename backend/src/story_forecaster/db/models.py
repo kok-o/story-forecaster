@@ -208,6 +208,7 @@ class AsyncTask(Base):
     status = Column(String(50), default="QUEUED")  # QUEUED, RUNNING, COMPLETED, CANCELLED, FAILED
     progress_pct = Column(Integer, default=0)
     cost_usd = Column(Float, default=0.0)
+    max_cost_limit_usd = Column(Float, default=0.50)
     error_message = Column(Text, nullable=True)
     params_json = Column(JSON, default=dict)
     result_json = Column(JSON, default=dict)

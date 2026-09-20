@@ -2,11 +2,13 @@ import os
 import json
 import time
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from .base import BaseLLMProvider, ProviderUnavailableError
 from ..domain.scope import ForecastScope
 from ..domain.forecast import ForecastResult, PredictionCandidate
 from ..domain.canon import ReferenceClassification
+from ..domain.writing import ScenePlan, CharacterVoiceProfile, SceneSynthesisOutput
+from ..domain.memory import NarrativeSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,24 @@ class GeminiProvider(BaseLLMProvider):
         # 2. Schema definition
         schema_json = json.dumps(ForecastResult.model_json_schema(), ensure_ascii=False, indent=2)
 
+        # 3. Narrative memory & character epistemic matrix
+        epistemic_raw = target_context.get("epistemic_states", [])
+        characters_raw = target_context.get("characters", {})
+        world_raw = target_context.get("world_conditions", {})
+        threads_raw = target_context.get("active_threads", [])
+
+        memory_blocks = []
+        if characters_raw:
+            memory_blocks.append(f"Active Characters:\n{json.dumps(characters_raw, ensure_ascii=False, indent=2)}")
+        if epistemic_raw:
+            memory_blocks.append(f"Character Epistemic States (Knowledge Boundaries):\n{json.dumps(epistemic_raw, ensure_ascii=False, indent=2)}")
+        if world_raw:
+            memory_blocks.append(f"World Conditions:\n{json.dumps(world_raw, ensure_ascii=False, indent=2)}")
+        if threads_raw:
+            memory_blocks.append(f"Open Plot Threads:\n{json.dumps(threads_raw, ensure_ascii=False, indent=2)}")
+
+        memory_section = "\n\n".join(memory_blocks) if memory_blocks else "None established."
+
         prompt_blocks = [
             "=== SECTION 1: WORK METADATA & BOUNDARY ===",
             f"Work Version ID: {scope.target_work_version_id}",
@@ -120,6 +140,9 @@ class GeminiProvider(BaseLLMProvider):
             "",
             "=== SECTION 2: PERMITTED SOURCE TEXTS ===",
             formatted_sources,
+            "",
+            "=== SECTION 2.5: NARRATIVE MEMORY & CHARACTER EPISTEMIC LIMITS ===",
+            memory_section,
             "",
             "=== SECTION 3: CANON OVERLAYS & AUTHORIAL PRECEDENTS ===",
             f"Canon Divergences:\n{json.dumps(canon_context, ensure_ascii=False, indent=2)}",
@@ -204,3 +227,145 @@ class GeminiProvider(BaseLLMProvider):
                     time.sleep(2 ** (attempt - 1))
 
         raise RuntimeError(f"Gemini generation failed after {self.max_retries} attempts: {last_err}")
+
+    def build_scene_synthesis_prompt(
+        self,
+        plan: ScenePlan,
+        snapshot: NarrativeSnapshot,
+        voice_profiles: List[CharacterVoiceProfile],
+        recent_scenes: Optional[List[Dict[str, Any]]] = None
+    ) -> Tuple[str, str]:
+        system_instruction = (
+            "You are an expert Russian light-novel author writing an ongoing novel continuation scene in the distinctive style of author N.B.\n\n"
+            "CRITICAL NARRATIVE AND EPISTEMIC CONSTRAINTS:\n"
+            f"1. POINT OF VIEW INTEGRITY: The scene must be narrated strictly from the perspective of POV character '{plan.pov_character}'. "
+            "Internal monologues, sensory impressions, and emotional filters belong exclusively to this POV character. "
+            "Never leak omniscient insights or narrate the internal, hidden thoughts of interlocutors.\n"
+            "2. EPISTEMIC INTEGRITY (THEORY OF MIND): Characters cannot speak of, react to, or act upon facts they do not possess. "
+            "Respect the exact knowledge state of each participant.\n"
+            "3. CHARACTER VOICES: Every dialogue line and interpersonal exchange must strictly follow the character's voice profile, "
+            "vocabulary tone, sentence structure, and mannerisms.\n"
+            "4. CITATION INTEGRITY FOR DELTAS: In all extracted inventory_changes, injuries_or_statuses, epistemic_updates, and dialogue_claims, "
+            "the 'span_quote' field MUST be an EXACT, VERBATIM substring copied directly from your generated prose. Never paraphrase or alter punctuation in quotes.\n"
+            "5. DIALOGUE CLAIMS: When a character boasts, threatens, lies, or makes unverified statements in dialogue, "
+            "record it in 'dialogue_claims' with is_world_fact=false.\n"
+            "6. BEAT COMPLIANCE: Execute all mandatory plot beats in chronological sequence while respecting target pacing and outcome."
+        )
+
+        prompt_blocks = [
+            f"# SCENE BLUEPRINT: {plan.scene_goal}",
+            f"POV Character: {plan.pov_character}",
+            f"Participants: {', '.join(plan.participants)}",
+            f"Initial State: {plan.initial_state_summary}",
+            f"Conflict Type: {plan.conflict_kind}",
+            f"Desired Outcome: {plan.desired_outcome}",
+            f"Target Pacing: {plan.target_pacing}",
+            f"Target Length: ~{plan.target_length_chars} characters",
+            "",
+            "## MANDATORY PLOT BEATS (Must occur in sequence):",
+        ]
+        for i, beat in enumerate(plan.mandatory_beats, 1):
+            prompt_blocks.append(f"{i}. {beat}")
+
+        if plan.permitted_changes:
+            prompt_blocks.append("\n## PERMITTED STATE CHANGES:")
+            for ch in plan.permitted_changes:
+                prompt_blocks.append(f"- {ch}")
+
+        if plan.known_information:
+            prompt_blocks.append("\n## THEORY OF MIND / KNOWN INFORMATION AT SCENE START:")
+            for char, facts in plan.known_information.items():
+                prompt_blocks.append(f"- {char}: {', '.join(facts)}")
+
+        if voice_profiles:
+            prompt_blocks.append("\n## CHARACTER VOICE PROFILES:")
+            for vp in voice_profiles:
+                mannerisms = "; ".join(vp.dialogue_mannerisms) if vp.dialogue_mannerisms else "None specified"
+                prompt_blocks.append(
+                    f"### Character: {vp.character_id}\n"
+                    f"- Tone: {vp.vocabulary_tone}\n"
+                    f"- Sentence Length: {vp.typical_sentence_length}\n"
+                    f"- Mannerisms: {mannerisms}\n"
+                    f"- Rationale: {vp.author_tuning_rationale}"
+                )
+
+        if snapshot:
+            prompt_blocks.append("\n## CURRENT NARRATIVE SNAPSHOT:")
+            if getattr(snapshot, "active_characters", None):
+                prompt_blocks.append("Active Characters & Items/Statuses:")
+                for char, data in snapshot.active_characters.items():
+                    inv = data.get("inventory", [])
+                    st = data.get("statuses", [])
+                    prompt_blocks.append(f"  * {char}: inventory=[{', '.join(inv)}], statuses=[{', '.join(st)}]")
+            if getattr(snapshot, "epistemic_states", None):
+                prompt_blocks.append("Character Epistemic Matrix (Beliefs & Known Facts):")
+                for ep in snapshot.epistemic_states[:10]:
+                    att_val = ep.attitude.value if hasattr(ep.attitude, "value") else str(ep.attitude)
+                    prompt_blocks.append(f"  * {ep.character_id} knows '{ep.fact_key}' (Attitude: {att_val})")
+
+        if recent_scenes:
+            prompt_blocks.append("\n## PRECEDING SCENE CONTEXT:")
+            for sc in recent_scenes[-2:]:
+                prompt_blocks.append(f"- Scene {sc.get('scene_ordinal', '?')} ({sc.get('title', 'Untitled')}): {sc.get('content', '')[:300]}...")
+
+        prompt_blocks.extend([
+            "",
+            "Generate the complete Russian literary narrative prose for this scene adhering to all constraints.",
+            "Simultaneously extract all state deltas (inventory changes, injuries/statuses, epistemic updates, dialogue claims, introduced characters) "
+            "with EXACT, VERBATIM span_quote citations copied directly from your prose."
+        ])
+
+        return system_instruction, "\n".join(prompt_blocks)
+
+    def synthesize_scene_prose(
+        self,
+        plan: ScenePlan,
+        snapshot: NarrativeSnapshot,
+        voice_profiles: List[CharacterVoiceProfile],
+        recent_scenes: Optional[List[Dict[str, Any]]] = None
+    ) -> Tuple[str, Dict[str, Any]]:
+        if not self.is_available():
+            raise ProviderUnavailableError(
+                "Gemini provider requested, but GEMINI_API_KEY is not configured or google-genai is not installed. "
+                "Configure GEMINI_API_KEY in settings.yaml or environment variables, or use provider='demo'."
+            )
+
+        system_instruction, prompt = self.build_scene_synthesis_prompt(
+            plan=plan,
+            snapshot=snapshot,
+            voice_profiles=voice_profiles,
+            recent_scenes=recent_scenes
+        )
+
+        last_err = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_schema": SceneSynthesisOutput,
+                        "system_instruction": system_instruction
+                    }
+                )
+
+                output = SceneSynthesisOutput.model_validate_json(response.text)
+                delta_dict = {
+                    "introduced_characters": output.introduced_characters,
+                    "inventory_changes": output.inventory_changes,
+                    "injuries_or_statuses": output.injuries_or_statuses,
+                    "epistemic_updates": output.epistemic_updates,
+                    "dialogue_claims": output.dialogue_claims,
+                    "is_synthetic_demonstration": False,
+                    "provider": self.model_name
+                }
+                return output.prose, delta_dict
+
+            except Exception as e:
+                last_err = e
+                logger.warning(f"Gemini scene synthesis attempt {attempt}/{self.max_retries} failed: {e}")
+                if attempt < self.max_retries:
+                    time.sleep(2 ** (attempt - 1))
+
+        raise RuntimeError(f"Gemini scene synthesis failed after {self.max_retries} attempts: {last_err}")

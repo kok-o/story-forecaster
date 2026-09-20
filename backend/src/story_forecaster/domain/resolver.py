@@ -59,6 +59,10 @@ def resolve_scope(
     project = None
     if project_id:
         project = db.query(Project).filter_by(id=project_id).first()
+        if not project:
+            raise ValueError(f"Project '{project_id}' not found.")
+        if work.project_id and work.project_id != project_id:
+            raise ValueError(f"Work '{work.title}' belongs to project '{work.project_id}', not requested '{project_id}'.")
     if not project and work.project_id:
         project = db.query(Project).filter_by(id=work.project_id).first()
     if not project:
@@ -70,7 +74,7 @@ def resolve_scope(
     if version_id:
         version = db.query(WorkVersion).filter_by(id=version_id, work_id=work.id).first()
         if not version:
-            version = db.query(WorkVersion).filter_by(id=version_id).first()
+            raise ValueError(f"Version '{version_id}' does not exist for work '{work.title}' ({work.id})")
     else:
         version = db.query(WorkVersion).filter_by(work_id=work.id).order_by(WorkVersion.created_at.desc()).first()
 

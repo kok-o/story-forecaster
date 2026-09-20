@@ -90,12 +90,25 @@ class ForecastEngine:
                         violations.append(f"Character '{name_clean}' is unintroduced at cutoff seq {scope.target_max_discourse_seq}")
 
         for state in epistemic_states:
-            char_name = getattr(state, "character", "")
-            false_beliefs = getattr(state, "false_beliefs", [])
-            for fb in false_beliefs:
+            char_name = getattr(state, "character_id", None) or getattr(state, "character", "")
+            fact_key = getattr(state, "fact_key", "")
+            attitude = getattr(state, "attitude", None)
+            attitude_val = attitude.value if hasattr(attitude, "value") else str(attitude or "")
+
+            if not char_name or not fact_key:
+                continue
+
+            fact_lower = fact_key.lower()
+
+            if attitude_val == "IGNORANT":
                 for beat in cand.key_events:
-                    if char_name in beat.participants and fb.lower() in beat.summary.lower():
-                        violations.append(f"{char_name} acts on unrevealed false belief: '{fb}'")
+                    if char_name in beat.participants and fact_lower in beat.summary.lower():
+                        violations.append(f"{char_name} reveals/acts on ignorant fact: '{fact_key}'")
+
+            elif attitude_val == "FALSE_BELIEF":
+                for beat in cand.key_events:
+                    if char_name in beat.participants and fact_lower in beat.summary.lower():
+                        violations.append(f"{char_name} acts on unrevealed false belief: '{fact_key}'")
 
         if violations:
             cand.continuity_verified = False
