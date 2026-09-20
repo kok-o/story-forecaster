@@ -126,13 +126,17 @@ class ForecastEngine:
         """
         db: Session = SessionLocal()
         db_run = None
-
         try:
-            # 1. Assemble volume-bounded narrative context
-            context_result = self.context_builder.build_context(db=db, scope=scope)
-
-            # 2. Point-in-time narrative state snapshot
+            # 1. Point-in-time narrative state snapshot
             snapshot = self.memory_engine.get_snapshot(scope)
+
+            # 2. Assemble volume-bounded narrative context with dynamic thread-based retrieval
+            context_result = self.context_builder.build_context(
+                db=db,
+                scope=scope,
+                snapshot=snapshot if not disable_memory else None,
+                retrieval_engine=self.retrieval_engine if not disable_retrieval else None
+            )
 
             # 3. Active canon alignments
             canon_overlays = [] if disable_canon else self.canon_registry.get_overlays(scope)
