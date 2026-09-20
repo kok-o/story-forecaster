@@ -9,8 +9,11 @@ from .models import (
     Run,
     Candidate,
     Branch,
-    BranchScene
+    BranchScene,
+    Arc,
+    AsyncTask
 )
+
 
 def migrate_columns():
     """Safely adds newly required columns to existing SQLite tables without data loss."""
@@ -71,5 +74,8 @@ __all__ = [
     "Run",
     "Candidate",
     "Branch",
-    "BranchScene"
+    "BranchScene",
+    "Arc",
+    "AsyncTask"
 ]
+

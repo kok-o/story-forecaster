@@ -24,14 +24,16 @@
     </div>
   </header>
 
-  <!-- Navigation Tabs -->
-  <nav class="nav-tabs">
     <button class="tab-btn active" id="tab-btn-forecast" onclick="switchTab('forecast')">🎯 Прогноз Главы 24</button>
     <button class="tab-btn" id="tab-btn-backtest" onclick="switchTab('backtest')">🧪 Слепой бэктест (Гл. 23)</button>
     <button class="tab-btn" id="tab-btn-search" onclick="switchTab('search')">🔍 Гибридный поиск (BM25)</button>
     <button class="tab-btn" id="tab-btn-canon" onclick="switchTab('canon')">📜 5-Статусный Канон HOTD</button>
     <button class="tab-btn" id="tab-btn-precedents" onclick="switchTab('precedents')">📚 Тропы автора N.B. (~20М зн.)</button>
+    <button class="tab-btn" id="tab-btn-writing" onclick="switchTab('writing')">✍ Писатель (Фанфик)</button>
+    <button class="tab-btn" id="tab-btn-arcs" onclick="switchTab('arcs')">🏛 Длинные арки и Редактура</button>
+    <button class="tab-btn" id="tab-btn-tasks" onclick="switchTab('tasks')">⚙ Очередь задач</button>
   </nav>
+
 
   <!-- Main Container -->
   <main class="main-container">
@@ -157,7 +159,226 @@
       <div id="precedents-container"></div>
     </section>
 
+    <!-- Tab 6: Writing (Fanfic Mode) -->
+    <section class="tab-content" id="tab-writing">
+      <div class="control-bar">
+        <div class="control-group">
+          <label for="writing-branch-select" style="font-weight: 600; color: var(--text-secondary);">Ветка повествования:</label>
+          <select id="writing-branch-select" class="input-field" onchange="onBranchSelected()">
+            <option value="">Загрузка веток...</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="showNewBranchPrompt()">+ Создать ветку</button>
+        <button class="btn-secondary" onclick="exportBranch('markdown')">💾 Экспорт MD</button>
+        <button class="btn-secondary" onclick="exportBranch('txt')">📄 Экспорт TXT</button>
+        <button class="btn-secondary" onclick="viewBranchSnapshot()">🔍 Срез памяти ветки</button>
+      </div>
+
+      <div class="split-workbench">
+        <!-- Sidebar: Scenes List -->
+        <div class="workbench-sidebar">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1rem; color: var(--accent-cyan);">Сцены ветки</h3>
+            <button class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="resetScenePlanner()">+ План</button>
+          </div>
+          <div id="writing-scenes-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Выберите ветку для загрузки сцен...</div>
+          </div>
+        </div>
+
+        <!-- Main: Planner & Scene Viewer -->
+        <div class="workbench-main">
+          <!-- Scene Planner Card -->
+          <div class="precedent-card" id="writing-planner-card">
+            <h3 style="color: var(--accent-cyan); margin-bottom: 1rem;" id="planner-card-title">📝 Планировщик новой сцены (ScenePlan)</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">Порядковый номер сцены:</label>
+                <input type="number" id="plan-scene-ordinal" class="input-field" style="width: 100%; margin-top: 0.25rem;" value="1" min="1">
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">Название сцены:</label>
+                <input type="text" id="plan-scene-title" class="input-field" style="width: 100%; margin-top: 0.25rem;" placeholder="Название эпизода...">
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">POV-персонаж:</label>
+                <select id="plan-scene-pov" class="input-field" style="width: 100%; margin-top: 0.25rem;">
+                  <option value="Хачиман Хикигая" selected>Хачиман Хикигая (циничный прагматик)</option>
+                  <option value="Сато Кадзума">Сато Кадзума (паникер-отаку с Кубом)</option>
+                  <option value="Фея">Фея (писклявая шантажистка)</option>
+                  <option value="Саэко Бусуджима">Саэко Бусуджима (сдержанная мечница)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">Участники сцены (через запятую):</label>
+                <input type="text" id="plan-scene-participants" class="input-field" style="width: 100%; margin-top: 0.25rem;" value="Хачиман Хикигая, Сато Кадзума">
+              </div>
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <label style="font-size: 0.85rem; color: var(--text-secondary);">Обязательные сюжетные биты (по одному на строку):</label>
+              <textarea id="plan-scene-beats" class="input-field" style="width: 100%; height: 75px; margin-top: 0.25rem; font-family: monospace;" placeholder="Покупка контракта Сато Кадзумы через Систему за 400 000 золотых&#10;Привязка Хорадримского Куба S-ранга к Кадзуме"></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">Исходное состояние:</label>
+                <input type="text" id="plan-scene-initial" class="input-field" style="width: 100%; margin-top: 0.25rem;" value="В комнате мерцает меню Системы Зла.">
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">Желаемый результат:</label>
+                <input type="text" id="plan-scene-outcome" class="input-field" style="width: 100%; margin-top: 0.25rem;" value="Кадзума нанят и принял привязку артефакта.">
+              </div>
+            </div>
+            <button class="btn-primary" id="btn-draft-scene" onclick="draftSceneFromPlan()">⚡ Сгенерировать черновик (Draft Scene)</button>
+          </div>
+
+          <!-- Active Scene Detailed Display -->
+          <div id="writing-scene-detail" style="display: none;">
+            <div class="precedent-card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                  <span class="badge" id="scene-detail-status-badge">ACCEPTED</span>
+                  <span class="badge badge-purple" id="scene-detail-rev-badge">Ревизия 1</span>
+                  <h2 style="font-size: 1.3rem; margin-top: 0.5rem;" id="scene-detail-title">Заголовок сцены</h2>
+                </div>
+                <div style="display: flex; gap: 0.5rem;" id="scene-actions-container">
+                  <button class="btn-success" onclick="acceptCurrentScene()">✓ Принять (Accept)</button>
+                  <button class="btn-danger" onclick="rejectCurrentScene()">✗ Отклонить (Reject)</button>
+                </div>
+              </div>
+
+              <!-- Validation Scorecard -->
+              <div id="scene-validation-banner" style="background: rgba(10, 13, 20, 0.7); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--accent-green); margin-bottom: 1.25rem;">
+                <div style="font-weight: 600; font-size: 0.9rem; color: var(--accent-green);" id="val-banner-title">Проверка целостности пройдена (100%)</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;" id="val-banner-notes">POV-утечки: 0 • Эпистемические нарушения: 0 • Исполнение битов: 100%</div>
+              </div>
+
+              <!-- Prose Body -->
+              <div class="prose-content" style="background: rgba(10, 13, 20, 0.4); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);" id="scene-detail-prose"></div>
+
+              <!-- Proposed State Delta -->
+              <div class="delta-panel" id="scene-detail-delta">
+                <h4 style="font-size: 0.95rem; color: var(--accent-cyan); margin-bottom: 0.5rem;">Предложенные изменения состояния (ProposedStateDelta):</h4>
+                <div id="delta-items-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+              </div>
+
+              <!-- Revision Form -->
+              <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <h4 style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Редактирование / Ревизия сцены:</h4>
+                <textarea id="revise-scene-content" class="input-field" style="width: 100%; height: 100px; font-family: monospace;"></textarea>
+                <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+                  <button class="btn-secondary" onclick="reviseCurrentScene()">Создать новую ревизию (Revise)</button>
+                  <button class="btn-secondary" onclick="rollbackStatusPrompt()">Откатить ранение/статус</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 7: Long Arcs & Editorial Quality -->
+    <section class="tab-content" id="tab-arcs">
+      <div class="control-bar">
+        <div class="control-group">
+          <label for="arcs-select" style="font-weight: 600; color: var(--text-secondary);">Сюжетная арка:</label>
+          <select id="arcs-select" class="input-field" onchange="onArcSelected()">
+            <option value="">Загрузка арок...</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="showNewArcPrompt()">+ Создать арку</button>
+        <button class="btn-secondary" onclick="runEditorialReview()">⚡ Запустить редакционный аудит главы</button>
+      </div>
+
+      <!-- Commitments & Age Tracker Banner -->
+      <div style="margin-top: 1.5rem;">
+        <h3 style="font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 0.75rem;">Контроль сюжетных обязательств и возраст линий (Chekhov's Guns)</h3>
+        <div class="scorecard-grid">
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Открытые обещания</div>
+            <div class="scorecard-val" style="color: var(--accent-yellow);" id="metric-open-promises">0</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Забытые линии (>4 сцен)</div>
+            <div class="scorecard-val" style="color: var(--accent-red);" id="metric-aging-promises">0</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Нерешенные загадки</div>
+            <div class="scorecard-val" style="color: var(--accent-purple);" id="metric-open-mysteries">0</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Ревизия арки</div>
+            <div class="scorecard-val" style="color: var(--accent-cyan);" id="metric-arc-revision">v1</div>
+          </div>
+        </div>
+
+        <div id="arc-commitments-table-container"></div>
+      </div>
+
+      <!-- Editorial Review Scorecard -->
+      <div id="editorial-review-container" style="margin-top: 2rem; display: none;">
+        <h3 style="font-size: 1.1rem; color: var(--accent-green); margin-bottom: 0.75rem;">Редакторская карта качества главы (Editorial Quality Scorecard)</h3>
+        <div class="scorecard-grid">
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Оценка темпа</div>
+            <div class="scorecard-val" style="color: var(--accent-cyan);" id="score-pacing">-</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Голоса персонажей</div>
+            <div class="scorecard-val" style="color: var(--accent-purple);" id="score-voice">-</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Причинная связность</div>
+            <div class="scorecard-val" style="color: var(--accent-green);" id="score-causal">-</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Штраф за штампы</div>
+            <div class="scorecard-val" style="color: var(--accent-red);" id="score-cliche">-</div>
+          </div>
+          <div class="scorecard-item">
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Итоговое качество</div>
+            <div class="scorecard-val" style="color: var(--accent-yellow);" id="score-overall">-</div>
+          </div>
+        </div>
+
+        <div class="precedent-card" style="margin-top: 1rem;">
+          <h4 style="font-size: 0.95rem; color: var(--accent-cyan); margin-bottom: 0.5rem;">Рекомендации и обнаруженные повторы:</h4>
+          <div id="editorial-findings-container"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 8: Persistent Task Queue -->
+    <section class="tab-content" id="tab-tasks">
+      <div class="control-bar">
+        <div class="control-group">
+          <label for="task-type-select" style="font-weight: 600; color: var(--text-secondary);">Тип задачи:</label>
+          <select id="task-type-select" class="input-field">
+            <option value="forecast_batch" selected>Пакетный прогноз глав (forecast_batch)</option>
+            <option value="arc_synthesis">Генерация глав арки (arc_synthesis)</option>
+            <option value="ablation_run">Бэктест-аблация компонентов (ablation_run)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="task-steps-input" style="font-size: 0.85rem; color: var(--text-secondary);">Шаги:</label>
+          <input type="number" id="task-steps-input" class="input-field" style="width: 80px;" value="4" min="1" max="20">
+        </div>
+        <div class="control-group">
+          <label for="task-budget-input" style="font-size: 0.85rem; color: var(--text-secondary);">Лимит ($):</label>
+          <input type="number" id="task-budget-input" class="input-field" style="width: 90px;" value="0.50" step="0.05" min="0.01">
+        </div>
+        <button class="btn-primary" onclick="enqueueTask()">Поставить в очередь</button>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <h3 style="font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 0.75rem;">Активные и завершенные задачи</h3>
+        <div id="tasks-table-container"></div>
+      </div>
+    </section>
+
   </main>
+
 
   <script src="/app.js"></script>
 </body>

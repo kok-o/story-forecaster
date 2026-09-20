@@ -30,6 +30,15 @@ from .writing import (
     ProposedStateDelta,
     SceneValidationResult
 )
+from .arc import (
+    ArcPlan,
+    ArcMilestone,
+    ReaderPromise,
+    ChapterPlan,
+    EditorialReview,
+    EditorialQualityScorecard
+)
+
 
 __all__ = [
     "ForecastScope",
@@ -54,6 +63,13 @@ __all__ = [
     "ScenePlan",
     "CharacterVoiceProfile",
     "ProposedStateDelta",
-    "SceneValidationResult"
+    "SceneValidationResult",
+    "ArcPlan",
+    "ArcMilestone",
+    "ReaderPromise",
+    "ChapterPlan",
+    "EditorialReview",
+    "EditorialQualityScorecard"
 ]
+
 

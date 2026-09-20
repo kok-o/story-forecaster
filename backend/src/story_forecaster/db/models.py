@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Integer, DateTime, Text, ForeignKey, JSON, UniqueConstraint, Index
+    Column, String, Integer, Float, DateTime, Text, ForeignKey, JSON, UniqueConstraint, Index
 )
+
 from sqlalchemy.orm import relationship
 from .session import Base
 
@@ -174,4 +175,43 @@ class BranchScene(Base):
     created_at = Column(DateTime, default=utc_now)
 
     branch = relationship("Branch", back_populates="scenes")
+
+
+class Arc(Base):
+    """
+    Narrative arc plan model coordinating multi-chapter progressions,
+    milestones, setups, payoffs, and reader promises.
+    """
+    __tablename__ = "arcs"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    branch_id = Column(String(36), ForeignKey("branches.id"), nullable=True)
+    title = Column(String(255), nullable=False)
+    arc_plan_json = Column(JSON, nullable=False)
+    revision_num = Column(Integer, default=1, nullable=False)
+    status = Column(String(50), default="ACTIVE")
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class AsyncTask(Base):
+    """
+    Persistent task model for background workers:
+    Tracks execution status, progress, cost limits, cancellations, and resumability.
+    """
+    __tablename__ = "async_tasks"
+
+    id = Column(String(36), primary_key=True, default=gen_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
+    task_type = Column(String(100), nullable=False)
+    status = Column(String(50), default="QUEUED")  # QUEUED, RUNNING, COMPLETED, CANCELLED, FAILED
+    progress_pct = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    error_message = Column(Text, nullable=True)
+    params_json = Column(JSON, default=dict)
+    result_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
 
