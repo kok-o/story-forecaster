@@ -77,7 +77,7 @@ flowchart TD
 
 ### 2. Клонирование и установка зависимостей
 ```bash
-git clone https://github.com/your-username/story-forecaster.git
+git clone https://github.com/kok-o/story-forecaster.git
 cd story-forecaster
 
 # Создание и активация виртуального окружения
