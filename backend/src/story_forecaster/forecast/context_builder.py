@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 from story_forecaster.domain.scope import ForecastScope
 from story_forecaster.domain.memory import NarrativeSnapshot
+from story_forecaster.domain.canon import CanonOverlay
+from story_forecaster.author.precedents import AuthorTransition
 from story_forecaster.db.models import Scene, Chapter
 from story_forecaster.retrieval.engine import HybridRetrievalEngine
 
@@ -36,7 +38,8 @@ class NarrativeContextBuilder:
     2. Sources are tagged with verifiable source_ids for citation verification.
     3. Source texts are strictly segregated from control instructions.
     4. Connects BM25 retrieval dynamically using active unresolved threads rather than static tags.
-    5. Truncation and source count metadata are tracked explicitly.
+    5. Includes verified canon alignments and authorial precedents with clear provenance.
+    6. Truncation and source count metadata are tracked explicitly.
     """
 
     def __init__(self, default_char_budget: int = 32000, default_max_scenes: int = 10):
@@ -52,7 +55,9 @@ class NarrativeContextBuilder:
         snapshot: Optional[NarrativeSnapshot] = None,
         retrieval_engine: Optional[HybridRetrievalEngine] = None,
         retrieval_top_k: int = 3,
-        retrieval_budget_chars: int = 6000
+        retrieval_budget_chars: int = 6000,
+        canon_overlays: Optional[List[CanonOverlay]] = None,
+        author_precedents: Optional[List[AuthorTransition]] = None
     ) -> ContextBuildResult:
         budget = char_budget if char_budget is not None else self.default_char_budget
         limit_scenes = max_scenes if max_scenes is not None else self.default_max_scenes
@@ -124,7 +129,6 @@ class NarrativeContextBuilder:
         retrieved_chars = 0
 
         if retrieval_engine is not None and snapshot is not None and snapshot.active_threads:
-            # Construct dynamic queries from high urgency / active open threads
             dynamic_queries = [t.title for t in snapshot.active_threads if t.urgency >= 3]
             if not dynamic_queries:
                 dynamic_queries = [t.title for t in snapshot.active_threads]
@@ -178,11 +182,44 @@ class NarrativeContextBuilder:
                 except Exception:
                     pass
 
+        # 3. Canon Alignments Section
+        canon_blocks = []
+        if canon_overlays:
+            for o in canon_overlays:
+                protagonist_note = "Известно герою" if o.is_known_to_protagonist else "Неизвестно герою (внешний канон)"
+                canon_blocks.append(
+                    f'<canon_element id="{o.element_id}" universe="{o.canon_universe}" relation="{o.canon_relation.value}">\n'
+                    f'<!-- {o.description} | {protagonist_note} | Источник: {o.source_canon_ref or "Canon"} -->\n'
+                    f'{o.notes or o.description}\n'
+                    f'</canon_element>'
+                )
+
+        # 4. Author Precedents Section
+        precedent_blocks = []
+        if author_precedents:
+            for p in author_precedents:
+                precedent_blocks.append(
+                    f'<precedent id="{p.transition_id}" source="{p.source_work}" chapter="{p.source_chapter}">\n'
+                    f'<!-- Ситуация: {p.abstract_situation} -->\n'
+                    f'<!-- Решение автора: {p.author_resolution} -->\n'
+                    f'<!-- Последствие: {p.consequence} -->\n'
+                    f'Цитата: «{p.source_text_snippet}»\n'
+                    f'</precedent>'
+                )
+
         # Build combined formatted text
         formatted_sections = ["<source_documents>\n" + "\n\n".join(doc_blocks) + "\n</source_documents>"]
         if retrieved_blocks:
             formatted_sections.append(
                 "<retrieved_evidence>\n" + "\n\n".join(retrieved_blocks) + "\n</retrieved_evidence>"
+            )
+        if canon_blocks:
+            formatted_sections.append(
+                "<canon_alignments>\n" + "\n\n".join(canon_blocks) + "\n</canon_alignments>"
+            )
+        if precedent_blocks:
+            formatted_sections.append(
+                "<author_precedents>\n" + "\n\n".join(precedent_blocks) + "\n</author_precedents>"
             )
 
         formatted_text = "\n\n".join(formatted_sections)
@@ -197,7 +234,11 @@ class NarrativeContextBuilder:
             "included_scenes_count": len(selected_pairs),
             "excluded_scenes_count": total_available - len(selected_pairs),
             "retrieved_sources_count": len(retrieved_sources),
-            "retrieved_chars": retrieved_chars
+            "retrieved_chars": retrieved_chars,
+            "included_canon_count": len(canon_overlays) if canon_overlays else 0,
+            "included_canon_ids": [o.element_id for o in canon_overlays] if canon_overlays else [],
+            "included_precedents_count": len(author_precedents) if author_precedents else 0,
+            "included_precedent_ids": [p.transition_id for p in author_precedents] if author_precedents else []
         }
 
         return ContextBuildResult(

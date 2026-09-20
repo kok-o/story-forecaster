@@ -130,23 +130,26 @@ class ForecastEngine:
             # 1. Point-in-time narrative state snapshot
             snapshot = self.memory_engine.get_snapshot(scope)
 
-            # 2. Assemble volume-bounded narrative context with dynamic thread-based retrieval
-            context_result = self.context_builder.build_context(
-                db=db,
-                scope=scope,
-                snapshot=snapshot if not disable_memory else None,
-                retrieval_engine=self.retrieval_engine if not disable_retrieval else None
-            )
-
-            # 3. Active canon alignments
+            # 2. Active canon alignments
             canon_overlays = [] if disable_canon else self.canon_registry.get_overlays(scope)
 
-            # 4. Authorial decision precedents
+            # 3. Authorial decision precedents
             if disable_author:
                 precedents = []
             else:
                 active_tags = ["fairy_blackmail", "trade", "subordinates", "dungeon_surge", "interlude"]
                 precedents = self.author_lib.query_precedents(scope, active_tags)
+
+            # 4. Assemble volume-bounded narrative context with dynamic thread-based retrieval, canon, and precedents
+            context_result = self.context_builder.build_context(
+                db=db,
+                scope=scope,
+                snapshot=snapshot if not disable_memory else None,
+                retrieval_engine=self.retrieval_engine if not disable_retrieval else None,
+                canon_overlays=canon_overlays,
+                author_precedents=precedents
+            )
+
 
             # 5. Retrieved historical excerpts
             if disable_retrieval:

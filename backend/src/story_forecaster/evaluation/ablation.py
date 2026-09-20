@@ -19,7 +19,7 @@ class AblationRunResult(BaseModel):
     spurious_beats_count: int = 0
 
 class AblationBenchmarkReport(BaseModel):
-    """Aggregate benchmark report across B0, B1, B2, and Full configurations."""
+    """Aggregate benchmark report across ablation configurations."""
     test_chapter: int
     runs: List[AblationRunResult]
     summary_analysis: str
@@ -30,11 +30,13 @@ class AblationBenchmarkReport(BaseModel):
 
 class AblationBenchmark:
     """
-    Evaluates individual component contributions (M4 specification):
+    Evaluates individual component contributions (M4/M5 specification):
     - B0: Baseline (recent sliding-window context only; no memory, no retrieval, no canon, no tropes)
     - B1: Context + Memory (EvidenceReducer + active threads + Theory of Mind epistemic states)
     - B2: Context + Memory + Search (BM25 dynamic retrieval from active goals)
-    - Config_Full: Full architecture (+ Canon registry + Authorial precedents)
+    - B3: Context + Memory + Canon (Canon alignments overlay)
+    - B4: Context + Memory + Author (Author precedent transitions)
+    - Config_C_full: Full architecture (Memory + Search + Canon + Author)
     """
 
     def __init__(self, engine: Optional[ForecastEngine] = None, evaluator: Optional[BacktestEvaluator] = None):
@@ -45,7 +47,8 @@ class AblationBenchmark:
         self,
         gold_chapter: GoldChapterData = CHAPTER_23_GOLD,
         cutoff_chapter: int = 22,
-        execute_live: bool = False
+        execute_live: bool = False,
+        include_fine_grained: bool = False
     ) -> AblationBenchmarkReport:
         from story_forecaster.db import SessionLocal
         from story_forecaster.db.models import Work, WorkVersion, Chapter, Scene
@@ -74,7 +77,7 @@ class AblationBenchmark:
             mode="retrospective"
         )
 
-        configs_meta = [
+        standard_configs = [
             ("B0_baseline", "Только недавний контекст (без retrieval, без канона, без тропов, без расширенной памяти)", {
                 "disable_retrieval": True, "disable_canon": True, "disable_author": True, "disable_memory": True
             }),
@@ -89,13 +92,55 @@ class AblationBenchmark:
             })
         ]
 
+        fine_grained_configs = [
+            ("B0_baseline", "Только недавний контекст (без retrieval, без канона, без тропов, без памяти)", {
+                "disable_retrieval": True, "disable_canon": True, "disable_author": True, "disable_memory": True
+            }),
+            ("B1_memory", "Недавний контекст + память (EvidenceReducer)", {
+                "disable_retrieval": True, "disable_canon": True, "disable_author": True, "disable_memory": False
+            }),
+            ("B2_search", "Недавний контекст + память + поиск BM25", {
+                "disable_retrieval": False, "disable_canon": True, "disable_author": True, "disable_memory": False
+            }),
+            ("B3_canon", "Недавний контекст + память + канонические оверлеи HOTD/KonoSuba", {
+                "disable_retrieval": True, "disable_canon": False, "disable_author": True, "disable_memory": False
+            }),
+            ("B4_author", "Недавний контекст + память + авторские прецеденты N.B.", {
+                "disable_retrieval": True, "disable_canon": True, "disable_author": False, "disable_memory": False
+            }),
+            ("Config_C_full", "Полная архитектура (Память + Поиск + Канон + Авторские прецеденты)", {
+                "disable_retrieval": False, "disable_canon": False, "disable_author": False, "disable_memory": False
+            }),
+            ("Full_minus_canon", "Полная архитектура без канона (изоляция вклада канона)", {
+                "disable_retrieval": False, "disable_canon": True, "disable_author": False, "disable_memory": False
+            }),
+            ("Full_minus_author", "Полная архитектура без авторских тропов (изоляция вклада автора)", {
+                "disable_retrieval": False, "disable_canon": False, "disable_author": True, "disable_memory": False
+            })
+        ]
+
+        configs_meta = fine_grained_configs if include_fine_grained else standard_configs
+
         if not execute_live:
-            static_scores = [
-                (0.615, 0.500, 0.800, 0.70, 0.550, 0.005, 2, 1),
-                (0.750, 0.650, 0.880, 0.85, 0.700, 0.004, 1, 1),
-                (0.833, 0.750, 0.940, 0.90, 0.780, 0.003, 1, 0),
-                (0.889, 0.800, 1.000, 1.00, 0.850, 0.002, 0, 0)
-            ]
+            if include_fine_grained:
+                static_scores = [
+                    (0.615, 0.500, 0.800, 0.70, 0.550, 0.005, 2, 1),
+                    (0.750, 0.650, 0.880, 0.85, 0.700, 0.004, 1, 1),
+                    (0.833, 0.750, 0.940, 0.90, 0.780, 0.003, 1, 0),
+                    (0.800, 0.700, 0.920, 0.90, 0.750, 0.004, 1, 1),
+                    (0.810, 0.720, 0.930, 0.88, 0.760, 0.003, 1, 1),
+                    (0.889, 0.800, 1.000, 1.00, 0.850, 0.002, 0, 0),
+                    (0.840, 0.760, 0.950, 0.92, 0.800, 0.003, 1, 0),
+                    (0.830, 0.750, 0.940, 0.90, 0.790, 0.003, 1, 0)
+                ]
+            else:
+                static_scores = [
+                    (0.615, 0.500, 0.800, 0.70, 0.550, 0.005, 2, 1),
+                    (0.750, 0.650, 0.880, 0.85, 0.700, 0.004, 1, 1),
+                    (0.833, 0.750, 0.940, 0.90, 0.780, 0.003, 1, 0),
+                    (0.889, 0.800, 1.000, 1.00, 0.850, 0.002, 0, 0)
+                ]
+
             runs = []
             for (name, desc, _), (f1, rec, prec, topo, mean_f1, var, missed, spur) in zip(configs_meta, static_scores):
                 runs.append(AblationRunResult(
@@ -112,12 +157,10 @@ class AblationBenchmark:
                 ))
             analysis = (
                 f"[ДЕМОНСТРАЦИОННЫЙ СЦЕНАРИЙ: статические демонстрационные показатели; реальный запуск выполняется с execute_live=True]\n"
-                f"Абляционный анализ для Главы {gold_chapter.chapter_ordinal}:\n"
-                f"1. B0 baseline: F1={static_scores[0][0]}, Recall={static_scores[0][1]}, Precision={static_scores[0][2]}, Missed={static_scores[0][6]}.\n"
-                f"2. B1 memory: F1={static_scores[1][0]}, Recall={static_scores[1][1]}, Precision={static_scores[1][2]}, Missed={static_scores[1][6]}.\n"
-                f"3. B2 search: F1={static_scores[2][0]}, Recall={static_scores[2][1]}, Precision={static_scores[2][2]}, Missed={static_scores[2][6]}.\n"
-                f"4. Config C full: F1={static_scores[3][0]}, Recall={static_scores[3][1]}, Precision={static_scores[3][2]}, Missed={static_scores[3][6]}."
+                f"Абляционный анализ компонентов для Главы {gold_chapter.chapter_ordinal}:\n"
+                + "\n".join([f"- {r.config_name}: F1={r.best_f1}, Recall={r.event_recall}, Precision={r.event_precision}, Missed={r.missed_events_count}" for r in runs])
             )
+
             return AblationBenchmarkReport(
                 test_chapter=gold_chapter.chapter_ordinal,
                 runs=runs,
@@ -150,10 +193,7 @@ class AblationBenchmark:
 
         analysis = (
             f"[ЭКСПЕРИМЕНТАЛЬНЫЙ ЗАПУСК: эмпирически измеренные показатели для Главы {gold_chapter.chapter_ordinal}]\n"
-            f"1. B0 baseline: F1={runs[0].best_f1}, Recall={runs[0].event_recall}, Missed={runs[0].missed_events_count}\n"
-            f"2. B1 memory: F1={runs[1].best_f1}, Recall={runs[1].event_recall}, Missed={runs[1].missed_events_count}\n"
-            f"3. B2 search: F1={runs[2].best_f1}, Recall={runs[2].event_recall}, Missed={runs[2].missed_events_count}\n"
-            f"4. Config C full: F1={runs[3].best_f1}, Recall={runs[3].event_recall}, Missed={runs[3].missed_events_count}"
+            + "\n".join([f"- {r.config_name}: F1={r.best_f1}, Recall={r.event_recall}, Missed={r.missed_events_count}" for r in runs])
         )
 
         return AblationBenchmarkReport(

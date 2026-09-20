@@ -19,6 +19,13 @@ class CanonRelation(str, Enum):
     DEPENDS_ON_CHANGED_CONDITIONS = "DEPENDS_ON_CHANGED_CONDITIONS" # Preconditions altered; needs causal re-evaluation
     UNKNOWN = "UNKNOWN"                       # Insufficient data to determine status
 
+class FanficModificationType(str, Enum):
+    """Origin and epistemic certainty of canon alteration in the fanfic."""
+    ORIGINAL_UNTOUCHED = "ORIGINAL_UNTOUCHED" # Intact canonical lore without fanfic alteration
+    EXPLICIT_CHANGE = "EXPLICIT_CHANGE"       # In-text explicit deviation caused by SI/protagonist actions
+    INFERRED_DIVERGENCE = "INFERRED_DIVERGENCE"# Causal ripple effect from prior changes
+    READER_SPECULATION = "READER_SPECULATION" # External hypothesis not yet established in narrative
+
 class EvidenceStatus(str, Enum):
     """Status of evidence supporting a canon relation."""
     EXPLICIT = "EXPLICIT"                     # Direct in-text observation/statement
@@ -42,16 +49,22 @@ class OccurrenceStatus(str, Enum):
 
 class CanonOverlay(BaseModel):
     """
-    Structured alignment entry for a canon event/entity evaluated on the 4 orthogonal axes.
+    Structured alignment entry for a canon event/entity evaluated on 4 orthogonal axes.
+    Separates reader knowledge from protagonist awareness.
     """
     element_id: str = Field(..., description="Unique ID of the canon element")
     canon_universe: str = Field(..., description="Originating universe (e.g., 'Highschool of the Dead')")
+    source_canon_ref: Optional[str] = Field(None, description="Original canon chapter/volume source citation")
     description: str = Field(..., description="Canonical description of event or entity")
     canon_relation: CanonRelation = Field(..., description="CONFIRMED | MODIFIED | PRESUMED_INTACT | UNKNOWN")
+    fanfic_modification_type: FanficModificationType = Field(FanficModificationType.ORIGINAL_UNTOUCHED)
+    is_known_to_protagonist: bool = Field(False, description="True only if the in-story protagonist has observed/deduced this")
+    version: str = Field("v1.0", description="Overlay schema revision")
     evidence_status: EvidenceStatus = Field(EvidenceStatus.ABSENT)
     dependency_status: DependencyStatus = Field(DependencyStatus.VALID)
     occurrence_status: OccurrenceStatus = Field(OccurrenceStatus.NOT_OBSERVED)
     supporting_refs: List[str] = Field(default_factory=list, description="Span IDs or Chapter citations supporting this status")
     contradicting_refs: List[str] = Field(default_factory=list, description="Contradicting span IDs")
+    source_spans: List[str] = Field(default_factory=list, description="Verifiable fanfic text spans")
     known_from_seq: int = Field(..., description="Discourse sequence index where this status was determined")
     notes: Optional[str] = None
